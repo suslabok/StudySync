@@ -1,0 +1,19 @@
+# secrets
+.env
+.env.local
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# node
+node_modules/
+dist/
+
+# local files
+*.db
+*.zip
+.DS_Store
