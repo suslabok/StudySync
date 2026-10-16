@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: light;
-}
+@import "tailwindcss";
 
-body {
-  background-color: #f8fafc;
-  color: #0f172a;
+@theme {
+  --color-plum-800: #4b3f5f;
+  --color-plum-900: #3a2f4a;
+  --color-sun-300: #fcd36e;
+  --color-sun-400: #f9c74f;
+  --color-coral-400: #f6837c;
+  --color-blush: #f4e1df;
 }

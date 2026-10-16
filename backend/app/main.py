@@ -4,8 +4,7 @@ from dotenv import load_dotenv
 from ariadne.asgi import GraphQL
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from app.schema import schema
+from app.api import schema
 
 load_dotenv()
 

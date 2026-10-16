@@ -3,7 +3,9 @@ import {
 } from "@apollo/client";
 import { setToken, getToken } from "../auth/token";
 
-const URI = import.meta.env.VITE_GRAPHQL_URL as string;
+// Keep the app usable with the local API even when no frontend .env file exists.
+// FastAPI mounts GraphQL at /graphql (without a trailing slash).
+const URI = (import.meta.env.VITE_GRAPHQL_URL || "http://localhost:8000/graphql").replace(/\/$/, "");
 
 const httpLink = new HttpLink({ uri: URI, credentials: "include" });
 
