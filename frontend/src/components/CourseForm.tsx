@@ -1,15 +1,14 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation } from "@apollo/client/react";
 import { CREATE_COURSE } from "../graphql/dashboard";
+import { Banner, Button, toFieldErrors, type ApiError } from "./AppShell";
 import TextField from "./TextField";
 
 const COLORS = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0891b2"];
-type Errors = { form?: string; code?: string; title?: string; color?: string };
-const FIELD_KEYS = ["code", "title", "color"];
 
 export default function CourseForm({ onDone }: { onDone: () => void }) {
   const [form, setForm] = useState({ code: "", title: "", instructor: "", color: COLORS[0] });
-  const [errors, setErrors] = useState<Errors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [run, { loading }] = useMutation<any>(CREATE_COURSE, {
     refetchQueries: ["Dashboard"],
     awaitRefetchQueries: true,
@@ -22,15 +21,8 @@ export default function CourseForm({ onDone }: { onDone: () => void }) {
     setErrors({});
     try {
       const { data } = await run({ variables: { ...form, instructor: form.instructor || null } });
-      const errs: { field: string | null; message: string }[] = data.createCourse.errors;
-      if (errs.length) {
-        const next: Errors = {};
-        for (const err of errs) {
-          const key = (FIELD_KEYS.includes(err.field ?? "") ? err.field : "form") as keyof Errors;
-          next[key] ??= err.message;
-        }
-        return setErrors(next);
-      }
+      const errs: ApiError[] = data.createCourse.errors;
+      if (errs.length) return setErrors(toFieldErrors(errs, ["code", "title", "color"]));
       onDone();
     } catch (err) {
       console.error(err);
@@ -64,18 +56,10 @@ export default function CourseForm({ onDone }: { onDone: () => void }) {
         {errors.color && <p className="mt-1.5 text-sm text-red-600">{errors.color}</p>}
       </div>
 
-      {errors.form && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{errors.form}</p>
-      )}
+      {errors.form && <Banner>{errors.form}</Banner>}
       <div className="flex gap-3">
-        <button disabled={loading}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60">
-          {loading ? "Saving…" : "Add course"}
-        </button>
-        <button type="button" onClick={onDone}
-          className="rounded-lg border border-slate-300 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-100">
-          Cancel
-        </button>
+        <Button disabled={loading}>{loading ? "Saving…" : "Add course"}</Button>
+        <Button type="button" variant="secondary" onClick={onDone}>Cancel</Button>
       </div>
     </form>
   );

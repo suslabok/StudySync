@@ -56,6 +56,12 @@ const css = `
 .gf .ov-right{right:0}
 .gf .box.right .ov-left{transform:translateX(0)}
 .gf .box.right .ov-right{transform:translateX(20%)}
+.gf .pw{position:relative;width:100%}
+.gf .pw input.fld{padding-right:46px}
+.gf .pw input::-ms-reveal{display:none}
+.gf .eye{position:absolute;top:0;right:6px;width:36px;height:42px;display:grid;place-items:center;border:0;border-radius:10px;background:none;color:#777;cursor:pointer}
+.gf .eye:hover{color:var(--ink)}
+.gf .eye:focus-visible{outline:2px solid #333;outline-offset:-2px}
 @media (max-width:600px){
   .gf .pane form{padding:0 16px}
   .gf h1,.gf .ov-pane h2{font-size:22px}
@@ -64,6 +70,29 @@ const css = `
 }
 @media (prefers-reduced-motion:reduce){.gf *{transition:none!important}}
 `;
+
+function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="pw">
+      <input {...props} className="fld" type={show ? "text" : "password"} />
+      <button type="button" className="eye" onClick={() => setShow((v) => !v)}
+        aria-label={show ? "Hide password" : "Show password"} aria-pressed={show} tabIndex={props.tabIndex}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {show ? (
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24M1 1l22 22" />
+          ) : (
+            <>
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </>
+          )}
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 export default function AuthPage({ mode }: { mode: "login" | "register" }) {
   const isRegister = mode === "register";
@@ -108,7 +137,7 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
               value={form.displayName} onChange={set("displayName")} required tabIndex={isRegister ? 0 : -1} />
             <input className="fld" type="email" placeholder="Email" aria-label="Email" autoComplete="email"
               value={form.email} onChange={set("email")} required tabIndex={isRegister ? 0 : -1} />
-            <input className="fld" type="password" placeholder={`Password (${MIN_PASSWORD_LENGTH}+ characters)`} aria-label="Password" autoComplete="new-password"
+            <PasswordInput placeholder={`Password (${MIN_PASSWORD_LENGTH}+ characters)`} aria-label="Password" autoComplete="new-password"
               value={form.password} onChange={set("password")} required minLength={MIN_PASSWORD_LENGTH} tabIndex={isRegister ? 0 : -1} />
             <button className="btn" disabled={loading} tabIndex={isRegister ? 0 : -1}>
               {loading ? "Please wait…" : "Sign up"}
@@ -126,7 +155,7 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
             <input className="fld" type="email" placeholder="Email" aria-label="Email" autoComplete="email"
               value={form.email} onChange={set("email")} required tabIndex={isRegister ? -1 : 0} />
             {/* No minLength here: login must never reject an existing password client-side */}
-            <input className="fld" type="password" placeholder="Password" aria-label="Password" autoComplete="current-password"
+            <PasswordInput placeholder="Password" aria-label="Password" autoComplete="current-password"
               value={form.password} onChange={set("password")} required tabIndex={isRegister ? -1 : 0} />
             <button className="btn" disabled={loading} tabIndex={isRegister ? -1 : 0}>
               {loading ? "Please wait…" : "Sign in"}

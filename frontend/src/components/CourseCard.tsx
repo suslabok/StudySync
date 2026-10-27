@@ -1,7 +1,7 @@
 import { useMutation } from "@apollo/client/react";
 import { DELETE_COURSE, type Course } from "../graphql/dashboard";
 
-export default function CourseCard({ course }: { course: Course }) {
+export default function CourseCard({ course, readOnly = false }: { course: Course; readOnly?: boolean }) {
   const [remove, { loading }] = useMutation(DELETE_COURSE, {
     variables: { id: course.id },
     refetchQueries: ["Dashboard"],
@@ -16,6 +16,7 @@ export default function CourseCard({ course }: { course: Course }) {
           <h3 className="truncate font-medium text-slate-900">{course.title}</h3>
           {course.instructor && <p className="mt-1 text-sm text-slate-500">{course.instructor}</p>}
         </div>
+        {!readOnly && (
         <button
           disabled={loading}
           aria-label={`Delete ${course.code}`}
@@ -26,6 +27,7 @@ export default function CourseCard({ course }: { course: Course }) {
         >
           Delete
         </button>
+        )}
       </div>
     </li>
   );

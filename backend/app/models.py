@@ -14,6 +14,7 @@ class User(TimestampMixin, Base):
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     is_active: Mapped[bool] = mapped_column(default=True)
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    avatar_file: Mapped[str | None] = mapped_column(String(64))
     
 class RefreshToken(TimestampMixin, Base):
     __tablename__ = "refresh_token"

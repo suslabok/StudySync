@@ -29,7 +29,7 @@ def current_semester(db: Session, user_id: int) -> Semester | None:
         .options(selectinload(Semester.courses)))
 
 
-def create_semester(db: Session, user_id: int, name: str, start_date: date, end_date: date) -> Semester:
+def _check_semester(name: str, start_date: date, end_date: date) -> str:
     name = name.strip()
     if not name:
         raise ApiError("REQUIRED", "Semester name is required", "name")
@@ -37,6 +37,29 @@ def create_semester(db: Session, user_id: int, name: str, start_date: date, end_
         raise ApiError("TOO_LONG", "Semester name must be 100 characters or fewer", "name")
     if end_date <= start_date:
         raise ApiError("INVALID_DATES", "End date must be after the start date", "endDate")
+    return name
+
+
+def update_semester(db: Session, user_id: int, semester_id: str, name: str,
+                    start_date: date, end_date: date) -> Semester:
+    try:
+        pk = int(semester_id)
+    except ValueError:
+        raise ApiError("NOT_FOUND", "Semester not found")
+    # filtering by owner: another user's id looks exactly like a missing one
+    semester = db.scalar(select(Semester)
+                         .where(Semester.id == pk, Semester.owner_id == user_id)
+                         .options(selectinload(Semester.courses)))
+    if semester is None:
+        raise ApiError("NOT_FOUND", "Semester not found")
+    semester.name = _check_semester(name, start_date, end_date)
+    semester.start_date, semester.end_date = start_date, end_date
+    db.commit()
+    return semester
+
+
+def create_semester(db: Session, user_id: int, name: str, start_date: date, end_date: date) -> Semester:
+    name = _check_semester(name, start_date, end_date)
     # a new semester becomes the current one
     db.execute(update(Semester)
                .where(Semester.owner_id == user_id, Semester.is_current.is_(True))

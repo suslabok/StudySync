@@ -25,6 +25,7 @@ extend type Query {
 
 extend type Mutation {
   createSemester(name: String!, startDate: Date!, endDate: Date!): SemesterPayload!
+  updateSemester(id: ID!, name: String!, startDate: Date!, endDate: Date!): SemesterPayload!
   createCourse(code: String!, title: String!, color: String, instructor: String): CoursePayload!
   deleteCourse(id: ID!): Boolean!
 }
@@ -68,6 +69,17 @@ def resolve_create_semester(_, info, name, start_date, end_date):
         user = current_user(info, db)
         try:
             semester = svc.create_semester(db, user.id, name, start_date, end_date)
+        except ApiError as e:
+            return {"semester": None, "errors": _errors(e)}
+        return {"semester": semester, "errors": []}
+
+
+@mutation.field("updateSemester")
+def resolve_update_semester(_, info, id, name, start_date, end_date):
+    with SessionLocal() as db:
+        user = current_user(info, db)
+        try:
+            semester = svc.update_semester(db, user.id, id, name, start_date, end_date)
         except ApiError as e:
             return {"semester": None, "errors": _errors(e)}
         return {"semester": semester, "errors": []}

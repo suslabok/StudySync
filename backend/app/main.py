@@ -4,7 +4,10 @@ from dotenv import load_dotenv
 from ariadne.asgi import GraphQL
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from app.api import schema
+from app.profile import MEDIA_DIR
 
 load_dotenv()
 
@@ -37,6 +40,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# profile photos: files in backend/media/avatars are served at /media/avatars/<name>
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+
 app.mount("/graphql", CookieMiddleware(GraphQL(
     schema,
     context_value=lambda request, data: {"request": request},

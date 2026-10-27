@@ -17,3 +17,6 @@ dist/
 *.db
 *.zip
 .DS_Store
+
+backend/media
+

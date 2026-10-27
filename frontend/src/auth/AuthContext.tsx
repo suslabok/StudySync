@@ -3,17 +3,17 @@ import { gql } from "@apollo/client";
 import { useApolloClient } from "@apollo/client/react";
 import { getToken, setToken, subscribeToken } from "./token";
 
-const ME = gql`query Me { me { id email displayName onboarded } }`;
+ const ME = gql`query Me { me { id email displayName onboarded avatarUrl } }`;
 const LOGOUT = gql`mutation Logout { logout }`;
 
-type User = { id: string; email: string; displayName: string; onboarded: boolean };
+ type User = { id: string; email: string; displayName: string; onboarded: boolean; avatarUrl?: string | null };
 type Ctx = {
   user: User | null;
   loading: boolean;
   signIn: (token: string, user: User) => void;
   signOut: () => Promise<void>;
+  updateUser: (patch: Partial<User>) => void;
 };
-
 const AuthContext = createContext<Ctx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -51,7 +51,10 @@ useEffect(() => {
     await client.clearStore();
   };
 
-  return <AuthContext.Provider value={{ user, loading, signIn, signOut }}>{children}</AuthContext.Provider>;
+ const updateUser = (patch: Partial<User>) =>
+  setUser((u) => (u ? { ...u, ...patch } : u));
+
+  return <AuthContext.Provider value={{ user, loading, signIn, signOut, updateUser }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {

@@ -3,9 +3,7 @@ import {
 } from "@apollo/client";
 import { setToken, getToken } from "../auth/token";
 
-// Keep the app usable with the local API even when no frontend .env file exists.
-// FastAPI mounts GraphQL at /graphql (without a trailing slash).
-const URI = (import.meta.env.VITE_GRAPHQL_URL || "http://localhost:8000/graphql").replace(/\/$/, "");
+const URI = (import.meta.env.VITE_GRAPHQL_URL || "http://localhost:8000/graphql").replace(/\/*$/, "/");
 
 const httpLink = new HttpLink({ uri: URI, credentials: "include" });
 
@@ -39,28 +37,41 @@ async function refreshAccessToken(): Promise<string | null> {
 const isUnauthenticated = (result: any) =>
   result?.errors?.some((e: any) => e.extensions?.code === "UNAUTHENTICATED");
 
+// The API answers an unauthenticated `me` with HTTP 400 (data is null), and Apollo then raises it
+// as an *error*, not a result. Look inside it, or the refresh never runs on page reload.
+function errorIsUnauthenticated(e: any): boolean {
+  let errors = e?.result?.errors;                                   // Apollo Client 3
+  if (!errors && typeof e?.bodyText === "string") {                 // Apollo Client 4
+    try { errors = JSON.parse(e.bodyText)?.errors; } catch { /* not JSON */ }
+  }
+  return !!errors?.some((x: any) => x?.extensions?.code === "UNAUTHENTICATED");
+}
+
 const refreshLink = new ApolloLink((operation, forward) =>
   new Observable((observer) => {
     let sub: { unsubscribe(): void } | undefined;
     let retrying = false;
     const skip = operation.getContext().skipRefresh === true;
 
+    const retry = (onFail: () => void) => {
+      retrying = true;
+      refreshAccessToken().then((token) => {
+        setToken(token);
+        if (!token) return onFail();                     // refresh failed: surface the original error
+        operation.setContext({ skipRefresh: true });     // retry only once
+        sub = forward(operation).subscribe(observer);
+      });
+    };
+
     sub = forward(operation).subscribe({
       next: (result) => {
         if (skip || !isUnauthenticated(result)) return observer.next(result);
-        retrying = true;
-        refreshAccessToken().then((token) => {
-          setToken(token);
-          if (!token) {                       // refresh failed: surface the original error
-            observer.next(result);
-            observer.complete();
-            return;
-          }
-          operation.setContext({ skipRefresh: true });   // retry only once
-          sub = forward(operation).subscribe(observer);
-        });
+        retry(() => { observer.next(result); observer.complete(); });
       },
-      error: (e) => observer.error(e),
+      error: (e) => {
+        if (skip || !errorIsUnauthenticated(e)) return observer.error(e);
+        retry(() => observer.error(e));
+      },
       complete: () => { if (!retrying) observer.complete(); },
     });
     return () => sub?.unsubscribe();
