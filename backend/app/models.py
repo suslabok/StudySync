@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base, TimestampMixin
 
@@ -54,4 +54,33 @@ class Course(TimestampMixin, Base):
     color: Mapped[str] = mapped_column(String(7), default="#2563eb")
     instructor: Mapped[str | None] = mapped_column(String(200))
 
+    # sharing: share_mode is None while the course is private
+    share_mode: Mapped[str | None] = mapped_column(String(10))
+    join_code: Mapped[str | None] = mapped_column(String(8), unique=True)
+    source_course_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course.id", ondelete="SET NULL"), index=True)
+
+    __table_args__ = (
+        CheckConstraint("share_mode IN ('classroom','group')", name="ck_course_share_mode"),
+    )
+
     semester: Mapped[Semester] = relationship(back_populates="courses")
+class Post(Base):
+    __tablename__ = "post"
+    __table_args__ = (Index("ix_post_course_created", "course_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("course.id", ondelete="CASCADE"))
+    author_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Comment(Base):
+    __tablename__ = "comment"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("post.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -21,6 +21,10 @@ export function Button({
   );
 }
 
+/** Classes for a plain <input>/<select>/<textarea> outside TextField. */
+export const fieldCls =
+  "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-plum-800 focus:outline-none focus:ring-2 focus:ring-sun-400";
+
 export function Card({ className = "", ...rest }: HTMLAttributes<HTMLDivElement>) {
   return <div className={`rounded-2xl border border-slate-100 bg-white p-6 shadow-sm ${className}`} {...rest} />;
 }
@@ -136,6 +140,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
   const onDashboard = pathname === "/";
+  const onCourses = pathname.startsWith("/courses");
   const onProfile = pathname.startsWith("/profile");
 
   return (
@@ -154,9 +159,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
           {onDashboard
             ? <NavItem icon="home" label="Dashboard" href="#top" active />
             : <NavItem icon="home" label="Dashboard" to="/" />}
-          {onDashboard
-            ? <NavItem icon="book" label="Courses" href="#courses" />
-            : <NavItem icon="book" label="Courses" to="/" />}
+          <NavItem icon="book" label="Courses" to="/courses" active={onCourses} />
           <NavItem icon="user" label="Profile" to="/profile" active={onProfile} />
           <NavItem icon="tasks" label="Tasks" soon />
           <NavItem icon="timer" label="Focus timer" soon />
@@ -286,7 +289,8 @@ export function SemesterNav({ semesters, current, shownId, startingSemester = fa
   );
 }
 
-function ProgressCard({ label, value, percent, note }: { label: string; value: string; percent?: number; note: string }) {
+/** A white card for the yellow side panel, with an optional progress bar. */
+export function SideCard({ label, value, percent, note }: { label: string; value: string; percent?: number; note?: string }) {
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm">
       <div className="flex items-baseline justify-between gap-2">
@@ -299,7 +303,7 @@ function ProgressCard({ label, value, percent, note }: { label: string; value: s
           <div className="h-full rounded-full bg-sun-400" style={{ width: `${percent}%` }} />
         </div>
       )}
-      <p className="mt-2 text-xs text-slate-500">{note}</p>
+      {note && <p className="mt-2 text-xs text-slate-500">{note}</p>}
     </div>
   );
 }
@@ -310,9 +314,6 @@ export function SemesterSummary({ shown, courses, viewed = false }: {
   courses: CourseLite[];
   viewed?: boolean;
 }) {
-  const { pathname } = useLocation();
-  const onDashboard = pathname === "/";
-
   if (!shown) {
     return (
       <>
@@ -331,21 +332,21 @@ export function SemesterSummary({ shown, courses, viewed = false }: {
       <div>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">Courses ({courses.length})</h3>
-          {onDashboard
-            ? <a href="#courses" className="text-xs underline">see all</a>
-            : <Link to="/" className="text-xs underline">see all</Link>}
+          <Link to="/courses" className="text-xs underline">see all</Link>
         </div>
         {courses.length === 0 ? (
           <p className="mt-3 text-sm">No courses yet.</p>
         ) : (
           <ul className="mt-3 flex flex-wrap gap-4">
             {courses.slice(0, 4).map((c) => (
-              <li key={c.id} className="flex w-14 flex-col items-center text-center">
-                <span className="grid h-11 w-11 place-items-center rounded-full text-xs font-bold text-white ring-2 ring-white"
-                  style={{ backgroundColor: c.color }} aria-hidden="true">
-                  {c.code.slice(0, 2).toUpperCase()}
-                </span>
-                <span className="mt-1 w-full truncate text-[11px] font-medium">{c.code}</span>
+              <li key={c.id} className="w-14">
+                <Link to={`/courses/${c.id}`} aria-label={`Open ${c.code}`} className="flex flex-col items-center text-center">
+                  <span className="grid h-11 w-11 place-items-center rounded-full text-xs font-bold text-white ring-2 ring-white"
+                    style={{ backgroundColor: c.color }} aria-hidden="true">
+                    {c.code.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="mt-1 w-full truncate text-[11px] font-medium">{c.code}</span>
+                </Link>
               </li>
             ))}
           </ul>
@@ -355,10 +356,10 @@ export function SemesterSummary({ shown, courses, viewed = false }: {
       <div>
         <h3 className="text-sm font-bold">Your progress</h3>
         <div className="mt-3 space-y-3">
-          <ProgressCard label="Semester progress" value={`${progress}%`} percent={progress}
+          <SideCard label="Semester progress" value={`${progress}%`} percent={progress}
             note={`${elapsedDays} of ${totalDays} days`} />
-          <ProgressCard label="Time left" value={`${daysLeft}d`} percent={100 - progress} note={timeLeftNote} />
-          <ProgressCard label="Courses" value={String(courses.length)} note={shown.name} />
+          <SideCard label="Time left" value={`${daysLeft}d`} percent={100 - progress} note={timeLeftNote} />
+          <SideCard label="Courses" value={String(courses.length)} note={shown.name} />
         </div>
       </div>
     </div>

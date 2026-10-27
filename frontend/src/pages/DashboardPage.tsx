@@ -8,6 +8,7 @@ import {
   fmtDate as fmt, semesterStats,
 } from "../components/AppShell";
 import CourseCard from "../components/CourseCard";
+import { JoinCourseForm } from "../components/CourseSharing";
 import CourseForm from "../components/CourseForm";
 import SemesterForm from "../components/SemesterForm";
 
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const { data, error, refetch } = useQuery<DashboardData>(DASHBOARD, { fetchPolicy: "cache-and-network" });
   const { data: semData } = useQuery<SemestersData>(SEMESTERS, { fetchPolicy: "cache-and-network" });
   const [adding, setAdding] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   // The Profile page can send us here to open a past semester or the "new semester" form
   const nav = useLocation().state as { viewSemesterId?: string; newSemester?: boolean } | null;
@@ -168,11 +170,20 @@ export default function DashboardPage() {
           <section id="courses" aria-labelledby="courses-heading" className="scroll-mt-6">
             <div className="flex items-center justify-between">
               <h2 id="courses-heading" className="text-xl font-extrabold">Your courses</h2>
-              {!adding && !viewed && <Button onClick={() => setAdding(true)}>Add course</Button>}
+              {!adding && !joining && !viewed && (
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setJoining(true)}>Join with code</Button>
+                  <Button onClick={() => setAdding(true)}>Add course</Button>
+                </div>
+              )}
             </div>
 
             {adding && !viewed && (
               <Card className="mt-4"><CourseForm onDone={() => setAdding(false)} /></Card>
+            )}
+
+            {joining && !viewed && (
+              <Card className="mt-4 max-w-md"><JoinCourseForm onDone={() => setJoining(false)} /></Card>
             )}
 
             {shownCourses.length === 0 && !adding ? (

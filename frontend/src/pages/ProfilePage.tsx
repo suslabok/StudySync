@@ -63,7 +63,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-3 last:border-b-0">
       <dt className="shrink-0 text-xs text-slate-500">{label}</dt>
-      <dd className="min-w-0 break-words text-right text-sm font-medium">{children}</dd>
+      <dd className="min-w-0 wrap-break-word text-right text-sm font-medium">{children}</dd>
     </div>
   );
 }

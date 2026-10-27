@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useMutation } from "@apollo/client/react";
 import { DELETE_COURSE, type Course } from "../graphql/dashboard";
 
@@ -13,9 +14,15 @@ export default function CourseCard({ course, readOnly = false }: { course: Cours
       <div className="flex min-w-0 flex-1 items-start justify-between gap-3 p-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{course.code}</p>
-          <h3 className="truncate font-medium text-slate-900">{course.title}</h3>
+          <h3 className="truncate font-medium text-slate-900">
+            <Link to={`/courses/${course.id}`} className="hover:underline">{course.title}</Link>
+          </h3>
           {course.instructor && <p className="mt-1 text-sm text-slate-500">{course.instructor}</p>}
         </div>
+        <div className="flex shrink-0 items-center gap-3 text-sm">
+        <Link to={`/courses/${course.id}`} className="font-medium text-plum-800 hover:underline">
+          Open{!readOnly && " / share"}
+        </Link>
         {!readOnly && (
         <button
           disabled={loading}
@@ -23,11 +30,12 @@ export default function CourseCard({ course, readOnly = false }: { course: Cours
           onClick={() => {
             if (window.confirm(`Delete ${course.code}? This cannot be undone.`)) remove().catch(console.error);
           }}
-          className="text-sm text-slate-400 hover:text-red-600 disabled:opacity-50"
+          className="text-slate-400 hover:text-red-600 disabled:opacity-50"
         >
           Delete
         </button>
         )}
+        </div>
       </div>
     </li>
   );

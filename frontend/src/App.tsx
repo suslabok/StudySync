@@ -3,6 +3,8 @@ import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import RequireAuth from "./auth/RequireAuth";
 import ProfilePage from "./pages/ProfilePage";
+import CoursePage from "./pages/CoursePages";
+import CoursesPage from "./pages/CoursesPage";
 
 export default function App() {
   return (
@@ -12,6 +14,8 @@ export default function App() {
       <Route element={<RequireAuth />}>
   <Route path="/" element={<DashboardPage />} />
   <Route path="/profile" element={<ProfilePage />} />
+  <Route path="/courses/:id" element={<CoursePage />} />
+  <Route path="/courses" element={<CoursesPage />} />
 </Route>
     </Routes>
   );
