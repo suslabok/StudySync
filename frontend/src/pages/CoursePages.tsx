@@ -69,12 +69,11 @@ export default function CoursePage() {
     <AppShell
       main={
         <div className="space-y-6">
-          <header className="rounded-3xl p-6 text-white sm:p-8" style={{ backgroundColor: s.color }}>
-            <Link to="/" className="text-xs text-white/80 underline">← Dashboard</Link>
-            <p className="mt-2 text-sm font-semibold text-white/80">{s.code}</p>
+          <header className="rounded-3xl bg-coral-400 p-6 text-plum-900 sm:p-8">
+            <p className="text-sm font-semibold">{s.code}</p>
             <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{s.title}</h1>
             {s.shared && (
-              <p className="mt-1 text-sm text-white/80">
+              <p className="mt-1 text-sm font-medium">
                 {s.mode === "group" ? "Study group" : `Taught by ${s.teacher?.displayName}`} · {s.memberCount} {s.memberCount === 1 ? "person" : "people"}
               </p>
             )}

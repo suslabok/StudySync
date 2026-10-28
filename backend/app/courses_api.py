@@ -11,7 +11,7 @@ from app.schema import current_user
 type_defs = """
 scalar Date
 
-type Course { id: ID!, code: String!, title: String!, color: String!, instructor: String }
+type Course { id: ID!, code: String!, title: String!, color: String!}
 type Semester { id: ID!, name: String!, startDate: Date!, endDate: Date!, isCurrent: Boolean!, courses: [Course!]! }
 type Dashboard { currentSemester: Semester, courses: [Course!]! }
 
@@ -26,7 +26,7 @@ extend type Query {
 extend type Mutation {
   createSemester(name: String!, startDate: Date!, endDate: Date!): SemesterPayload!
   updateSemester(id: ID!, name: String!, startDate: Date!, endDate: Date!): SemesterPayload!
-  createCourse(code: String!, title: String!, color: String, instructor: String): CoursePayload!
+  createCourse(code: String!, title: String!, color: String!): CoursePayload!
   deleteCourse(id: ID!): Boolean!
 }
 """
@@ -86,11 +86,11 @@ def resolve_update_semester(_, info, id, name, start_date, end_date):
 
 
 @mutation.field("createCourse")
-def resolve_create_course(_, info, code, title, color=None, instructor=None):
+def resolve_create_course(_, info, code, title, color=None):
     with SessionLocal() as db:
         user = current_user(info, db)
         try:
-            course = svc.create_course(db, user.id, code, title, color, instructor)
+            course = svc.create_course(db, user.id, code, title, color)
         except ApiError as e:
             return {"course": None, "errors": _errors(e)}
         return {"course": course, "errors": []}

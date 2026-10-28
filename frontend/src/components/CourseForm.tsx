@@ -7,20 +7,20 @@ import TextField from "./TextField";
 const COLORS = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0891b2"];
 
 export default function CourseForm({ onDone }: { onDone: () => void }) {
-  const [form, setForm] = useState({ code: "", title: "", instructor: "", color: COLORS[0] });
+  const [form, setForm] = useState({ code: "", title: "", color: COLORS[0] });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [run, { loading }] = useMutation<any>(CREATE_COURSE, {
     refetchQueries: ["Dashboard"],
     awaitRefetchQueries: true,
   });
-  const set = (key: "code" | "title" | "instructor") => (e: ChangeEvent<HTMLInputElement>) =>
+  const set = (key: "code" | "title" ) => (e: ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [key]: e.target.value });
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErrors({});
     try {
-      const { data } = await run({ variables: { ...form, instructor: form.instructor || null } });
+      const { data } = await run({ variables: { ...form } });
       const errs: ApiError[] = data.createCourse.errors;
       if (errs.length) return setErrors(toFieldErrors(errs, ["code", "title", "color"]));
       onDone();
@@ -40,7 +40,6 @@ export default function CourseForm({ onDone }: { onDone: () => void }) {
             onChange={set("title")} error={errors.title} required />
         </div>
       </div>
-      <TextField label="Instructor (optional)" value={form.instructor} onChange={set("instructor")} />
 
       <div>
         <span className="mb-1.5 block text-sm font-medium text-slate-700">Colour</span>

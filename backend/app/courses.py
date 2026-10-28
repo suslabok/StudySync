@@ -72,7 +72,7 @@ def create_semester(db: Session, user_id: int, name: str, start_date: date, end_
 
 
 def create_course(db: Session, user_id: int, code: str, title: str,
-                  color: str | None, instructor: str | None) -> Course:
+                  color: str | None) -> Course:
     code, title = code.strip(), title.strip()
     if not code:
         raise ApiError("REQUIRED", "Course code is required", "code")
@@ -85,7 +85,6 @@ def create_course(db: Session, user_id: int, code: str, title: str,
     color = color or DEFAULT_COLOR
     if not HEX_COLOR.match(color):
         raise ApiError("INVALID_COLOR", "Choose a valid colour", "color")
-    instructor = (instructor or "").strip()[:200] or None
 
     semester = db.scalar(select(Semester).where(
         Semester.owner_id == user_id, Semester.is_current.is_(True)))
@@ -93,7 +92,7 @@ def create_course(db: Session, user_id: int, code: str, title: str,
         raise ApiError("NO_SEMESTER", "Create a semester first")
 
     course = Course(owner_id=user_id, semester_id=semester.id, code=code,
-                    title=title, color=color, instructor=instructor)
+                    title=title, color=color)
     db.add(course)
     db.commit()
     return course

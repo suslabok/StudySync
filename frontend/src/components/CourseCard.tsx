@@ -17,7 +17,6 @@ export default function CourseCard({ course, readOnly = false }: { course: Cours
           <h3 className="truncate font-medium text-slate-900">
             <Link to={`/courses/${course.id}`} className="hover:underline">{course.title}</Link>
           </h3>
-          {course.instructor && <p className="mt-1 text-sm text-slate-500">{course.instructor}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-3 text-sm">
         <Link to={`/courses/${course.id}`} className="font-medium text-plum-800 hover:underline">

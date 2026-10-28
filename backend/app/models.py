@@ -52,7 +52,6 @@ class Course(TimestampMixin, Base):
     code: Mapped[str] = mapped_column(String(20))
     title: Mapped[str] = mapped_column(String(200))
     color: Mapped[str] = mapped_column(String(7), default="#2563eb")
-    instructor: Mapped[str | None] = mapped_column(String(200))
 
     # sharing: share_mode is None while the course is private
     share_mode: Mapped[str | None] = mapped_column(String(10))

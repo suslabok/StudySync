@@ -1,6 +1,6 @@
 import { gql } from "@apollo/client";
 
-export type Course = { id: string; code: string; title: string; color: string; instructor: string | null };
+export type Course = { id: string; code: string; title: string; color: string};
 export type Semester = { id: string; name: string; startDate: string; endDate: string };
 export type SemesterWithCourses = Semester & { isCurrent: boolean; courses: Course[] };
 export type SemestersData = { semesters: SemesterWithCourses[] };
@@ -10,7 +10,7 @@ export const DASHBOARD = gql`
   query Dashboard {
     dashboard {
       currentSemester { id name startDate endDate }
-      courses { id code title color instructor }
+      courses { id code title color}
     }
   }
 `;
@@ -19,7 +19,7 @@ export const SEMESTERS = gql`
   query Semesters {
     semesters {
       id name startDate endDate isCurrent
-      courses { id code title color instructor }
+      courses { id code title color  }
     }
   }
 `;
@@ -43,9 +43,9 @@ export const UPDATE_SEMESTER = gql`
 `;
 
 export const CREATE_COURSE = gql`
-  mutation CreateCourse($code: String!, $title: String!, $color: String, $instructor: String) {
-    createCourse(code: $code, title: $title, color: $color, instructor: $instructor) {
-      course { id code title color instructor }
+  mutation CreateCourse($code: String!, $title: String!, $color: String!) {
+    createCourse(code: $code, title: $title, color: $color) {
+      course { id code title color }
       errors { field code message }
     }
   }

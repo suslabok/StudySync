@@ -134,10 +134,8 @@ def join_course(db: Session, user: User, code: str) -> dict:
         semester = db.scalar(select(Semester).where(Semester.owner_id == user.id, Semester.is_current.is_(True)))
         if semester is None:
             raise ShareError("code", "NO_SEMESTER", "Set up your current semester first. The course is added to it.")
-        teacher = db.get(User, root.owner_id)
         existing = Course(owner_id=user.id, semester_id=semester.id, code=root.code, title=root.title,
-                          color=root.color, instructor=root.instructor or teacher.display_name,
-                          source_course_id=root.id)
+                          color=root.color, source_course_id=root.id)
         db.add(existing)
         db.commit()
     return space(db, user, existing.id)  # joining twice is harmless
