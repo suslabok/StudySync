@@ -1,8 +1,19 @@
+"""Course sharing: a course becomes a class by getting a join code.
+
+* The course you share is the ORIGINAL. Its owner is the teacher (classroom) or just
+  another member (group).
+* Joining with the code creates a LINKED COPY of the course in the joiner's current
+  semester (source_course_id -> original). It shows up on their dashboard and in their
+  tasks like any course. Deleting that copy = leaving. 'Leave' unlinks it but keeps it.
+* The stream (posts, comments) belongs to the original; everyone reaches it through
+  their own course id. Anyone else gets NOT_FOUND.
+"""
 import secrets
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import tasks as task_svc
 from app.models import Comment, Course, Post, Semester, User
 from app.profile import avatar_url
 
@@ -116,6 +127,7 @@ def stop_sharing(db: Session, user: User, course_id) -> dict:
         raise ShareError(None, "FORBIDDEN", "Only the owner of a shared course can do that.")
     course.share_mode = None
     course.join_code = None
+    task_svc.drop_course_assignments(db, course.id)                  # assignments and everyone's copies
     db.query(Post).filter(Post.course_id == course.id).delete()  # comments cascade in the DB
     db.query(Course).filter(Course.source_course_id == course.id).update({Course.source_course_id: None})
     db.commit()
@@ -137,6 +149,8 @@ def join_course(db: Session, user: User, code: str) -> dict:
         existing = Course(owner_id=user.id, semester_id=semester.id, code=root.code, title=root.title,
                           color=root.color, source_course_id=root.id)
         db.add(existing)
+        db.flush()
+        task_svc.give_member_assignments(db, user, existing, root)  # work already set on the course
         db.commit()
     return space(db, user, existing.id)  # joining twice is harmless
 
@@ -145,6 +159,7 @@ def leave_course(db: Session, user: User, course_id) -> None:
     course = _own_course(db, user, course_id)
     if course.source_course_id is None:
         raise ShareError(None, "OWNER", "You own this course. Stop sharing it instead.")
+    task_svc.drop_member_assignments(db, user, course.source_course_id)
     course.source_course_id = None  # keeps the course, now private to you
     db.commit()
 

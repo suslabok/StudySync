@@ -119,8 +119,6 @@ export function JoinCourseForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-/* ---------- stream ---------- */
-
 /** The announcements stream of a shared course. `courseId` is the viewer's own course id. */
 export default function Stream({ courseId, canPost, mode }: { courseId: string; canPost: boolean; mode: "classroom" | "group" }) {
   const { data } = useQuery<{ posts: StreamPost[] }>(POSTS, { variables: { courseId }, fetchPolicy: "cache-and-network" });

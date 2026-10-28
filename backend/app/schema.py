@@ -1,5 +1,4 @@
 import os
-
 from ariadne import MutationType, ObjectType, QueryType, make_executable_schema
 from graphql import GraphQLError
 

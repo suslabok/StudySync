@@ -27,7 +27,7 @@ export default function Avatar({ name, url, size = 40, className = "" }: Props) 
     <span
       aria-hidden="true"
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
-      className={`grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-sun-400 to-coral-400 font-bold text-plum-900 ${className}`}
+      className={`grid shrink-0 place-items-center rounded-full bg-linear-to-br from-sun-400 to-coral-400 font-bold text-plum-900 ${className}`}
     >
       {initialsOf(name)}
     </span>

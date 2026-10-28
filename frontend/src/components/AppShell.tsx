@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useQuery } from "@apollo/client/react";
 import { useAuth } from "../auth/AuthContext";
 import Avatar from "./Avatar";
+import { DUE_SOON, dueLabel, isOverdue, type DueSoonData } from "../graphql/tasks";
 
 const BUTTON = {
   primary: "bg-plum-800 text-white shadow-sm hover:bg-plum-900",
@@ -137,22 +139,24 @@ function NavItem({ icon, label, href, to, active, soon }: {
 }
 
 function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const { pathname } = useLocation();
   const onDashboard = pathname === "/";
-  const onCourses = pathname.startsWith("/courses");
-  const onProfile = pathname.startsWith("/profile");
+  const onCourses = pathname.startsWith("/courses"); // course detail pages keep "Courses" highlighted
+  const onTasks = pathname.startsWith("/tasks");
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col bg-plum-800 px-4 py-8 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start">
-      <div className="flex flex-col items-center text-center">
-        <Link to="/profile" aria-label="Your profile"
-          className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-sun-400">
-          <Avatar name={user?.displayName ?? ""} url={user?.avatarUrl} size={64} />
-        </Link>
-        <p className="mt-3 max-w-full truncate text-sm font-semibold">{user?.displayName}</p>
-        <p className="max-w-full truncate text-xs text-white/60">{user?.email}</p>
-      </div>
+      <Link to="/" aria-label="StudySync home"
+        className="flex items-center gap-2.5 rounded-xl px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-sun-400">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-linear-to-br from-sun-400 to-coral-400 text-plum-900">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+        </span>
+        <span className="text-xl font-extrabold tracking-tight">StudySync</span>
+      </Link>
 
       <nav aria-label="Main" className="mt-10">
         <ul className="space-y-1">
@@ -160,8 +164,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
             ? <NavItem icon="home" label="Dashboard" href="#top" active />
             : <NavItem icon="home" label="Dashboard" to="/" />}
           <NavItem icon="book" label="Courses" to="/courses" active={onCourses} />
-          <NavItem icon="user" label="Profile" to="/profile" active={onProfile} />
-          <NavItem icon="tasks" label="Tasks" soon />
+          <NavItem icon="tasks" label="Tasks" to="/tasks" active={onTasks} />
           <NavItem icon="timer" label="Focus timer" soon />
           <NavItem icon="calendar" label="Calendar" soon />
         </ul>
@@ -216,6 +219,10 @@ function AccountMenu() {
             <p className="truncate text-sm font-medium">{user?.displayName}</p>
             <p className="truncate text-xs text-slate-500">{user?.email}</p>
           </div>
+          <Link role="menuitem" to="/profile" onClick={() => setOpen(false)}
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
+            Profile
+          </Link>
           <button role="menuitem" onClick={signOut}
             className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
             Log out
@@ -223,6 +230,24 @@ function AccountMenu() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Top-right on desktop: photo + name, goes straight to the profile page. */
+function ProfileLink() {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const active = pathname.startsWith("/profile");
+  return (
+    <Link to="/profile" aria-label="Your profile" aria-current={active ? "page" : undefined}
+      className={`flex min-w-0 max-w-full items-center gap-3 rounded-full py-1 pl-1 pr-4 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-plum-800 ${
+        active ? "bg-slate-100" : ""}`}>
+      <Avatar name={user?.displayName ?? ""} url={user?.avatarUrl} size={44} />
+      <span className="min-w-0 text-left leading-tight">
+        <span className="block truncate text-sm font-bold">{user?.displayName}</span>
+        <span className="block truncate text-xs text-slate-500">{user?.email}</span>
+      </span>
+    </Link>
   );
 }
 
@@ -239,11 +264,13 @@ export function AppShell({ main, side, semesterNav }: {
         <AccountMenu />
       </header>
       <main className="min-w-0 flex-1 p-5 sm:p-8 lg:px-10 lg:py-8">{main}</main>
-      <aside
-        className="shrink-0 bg-sun-300 p-5 sm:p-8 lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:self-start lg:overflow-y-auto"
-        aria-label="Summary"
-      >
-        {side}
+      <aside aria-label="Summary"
+        className="shrink-0 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-80 lg:flex-col lg:self-start">
+        {/* white strip with the profile, like the middle of the page; yellow starts below it */}
+        <div className="hidden justify-end bg-white px-5 py-3 lg:flex"><ProfileLink /></div>
+        <div className="bg-sun-300 p-5 sm:p-8 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:rounded-tl-3xl">
+          {side}
+        </div>
       </aside>
     </div>
   );
@@ -308,6 +335,42 @@ export function SideCard({ label, value, percent, note }: { label: string; value
   );
 }
 
+/** "Due soon" card for the yellow side panel. Shows a real error instead of an empty list. */
+function DueSoon() {
+  // task mutations refetch this by passing DUE_SOON in refetchQueries
+  const { data, loading, error, refetch } = useQuery<DueSoonData>(DUE_SOON, { fetchPolicy: "cache-and-network" });
+  const items = data?.dueSoon ?? [];
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold">Due soon</h3>
+        <Link to="/tasks" className="text-xs underline">see all</Link>
+      </div>
+      {error && !data ? (
+        <p role="alert" className="mt-3 text-sm">
+          Could not load tasks.{" "}
+          <button onClick={() => refetch()} className="font-medium underline">Try again</button>
+        </p>
+      ) : loading && !data ? (
+        <p className="mt-3 text-sm" aria-busy="true">Loading…</p>
+      ) : items.length === 0 ? (
+        <p className="mt-3 text-sm">Nothing due in the next 7 days.</p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {items.map((t) => (
+            <li key={t.id} className="rounded-xl bg-white p-3 shadow-sm">
+              <p className="truncate text-sm font-semibold">{t.title}</p>
+              <p className={`mt-0.5 text-xs ${isOverdue(t) ? "font-semibold text-red-600" : "text-slate-500"}`}>
+                {t.course ? `${t.course.code} · ` : ""}{dueLabel(t.dueDate)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** Right (yellow) panel: course bubbles + progress cards. */
 export function SemesterSummary({ shown, courses, viewed = false }: {
   shown: SemLite | null;
@@ -353,15 +416,29 @@ export function SemesterSummary({ shown, courses, viewed = false }: {
         )}
       </div>
 
+      {!viewed && <DueSoon />}
+
       <div>
         <h3 className="text-sm font-bold">Your progress</h3>
         <div className="mt-3 space-y-3">
-          <SideCard label="Semester progress" value={`${progress}%`} percent={progress}
-            note={`${elapsedDays} of ${totalDays} days`} />
-          <SideCard label="Time left" value={`${daysLeft}d`} percent={100 - progress} note={timeLeftNote} />
-          <SideCard label="Courses" value={String(courses.length)} note={shown.name} />
+          <SemesterStatsCards progress={progress} elapsedDays={elapsedDays} totalDays={totalDays}
+            daysLeft={daysLeft} timeLeftNote={timeLeftNote} count={courses.length} name={shown.name} />
         </div>
       </div>
     </div>
+  );
+}
+
+function SemesterStatsCards({ progress, elapsedDays, totalDays, daysLeft, timeLeftNote, count, name }: {
+  progress: number; elapsedDays: number; totalDays: number; daysLeft: number;
+  timeLeftNote: string; count: number; name: string;
+}) {
+  return (
+    <>
+      <SideCard label="Semester progress" value={`${progress}%`} percent={progress}
+        note={`${elapsedDays} of ${totalDays} days`} />
+      <SideCard label="Time left" value={`${daysLeft}d`} percent={100 - progress} note={timeLeftNote} />
+      <SideCard label="Courses" value={String(count)} note={name} />
+    </>
   );
 }

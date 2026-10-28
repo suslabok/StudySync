@@ -1,27 +1,36 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation } from "@apollo/client/react";
 import { CREATE_COURSE } from "../graphql/dashboard";
+import { UPDATE_COURSE } from "../graphql/files";
 import { Banner, Button, toFieldErrors, type ApiError } from "./AppShell";
 import TextField from "./TextField";
 
 const COLORS = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0891b2"];
 
-export default function CourseForm({ onDone }: { onDone: () => void }) {
-  const [form, setForm] = useState({ code: "", title: "", color: COLORS[0] });
+type CourseLite = { id: string; code: string; title: string; color: string };
+
+/** Add a course, or edit one when `course` is given (works for courses in any semester). */
+export default function CourseForm({ course, onDone }: { course?: CourseLite; onDone: () => void }) {
+  const editing = !!course;
+  const [form, setForm] = useState({
+    code: course?.code ?? "", title: course?.title ?? "", color: course?.color ?? COLORS[0],
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [run, { loading }] = useMutation<any>(CREATE_COURSE, {
-    refetchQueries: ["Dashboard"],
+  const [run, { loading }] = useMutation<any>(editing ? UPDATE_COURSE : CREATE_COURSE, {
+    refetchQueries: ["Dashboard", "Semesters"],
     awaitRefetchQueries: true,
   });
-  const set = (key: "code" | "title" ) => (e: ChangeEvent<HTMLInputElement>) =>
+  const set = (key: "code" | "title") => (e: ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [key]: e.target.value });
+  // a colour that isn't in the palette (older course) still shows as selected
+  const palette = COLORS.includes(form.color) ? COLORS : [form.color, ...COLORS];
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErrors({});
     try {
-      const { data } = await run({ variables: { ...form } });
-      const errs: ApiError[] = data.createCourse.errors;
+      const { data } = await run({ variables: editing ? { id: course!.id, ...form } : { ...form } });
+      const errs: ApiError[] = data[editing ? "updateCourse" : "createCourse"].errors;
       if (errs.length) return setErrors(toFieldErrors(errs, ["code", "title", "color"]));
       onDone();
     } catch (err) {
@@ -44,7 +53,7 @@ export default function CourseForm({ onDone }: { onDone: () => void }) {
       <div>
         <span className="mb-1.5 block text-sm font-medium text-slate-700">Colour</span>
         <div className="flex flex-wrap gap-2">
-          {COLORS.map((c) => (
+          {palette.map((c) => (
             <button key={c} type="button" aria-label={`Colour ${c}`} aria-pressed={form.color === c}
               onClick={() => setForm({ ...form, color: c })}
               style={{ backgroundColor: c }}
@@ -57,7 +66,7 @@ export default function CourseForm({ onDone }: { onDone: () => void }) {
 
       {errors.form && <Banner>{errors.form}</Banner>}
       <div className="flex gap-3">
-        <Button disabled={loading}>{loading ? "Saving…" : "Add course"}</Button>
+        <Button disabled={loading}>{loading ? "Saving…" : editing ? "Save changes" : "Add course"}</Button>
         <Button type="button" variant="secondary" onClick={onDone}>Cancel</Button>
       </div>
     </form>

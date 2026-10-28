@@ -16,7 +16,7 @@ from app.models import RefreshToken, User
 
 MAX_PASSWORD_LENGTH = 128
 
-# ---------- avatar storage ----------
+#  avatar storage
 # backend/media/avatars/<file>.jpg  (served by main.py at /media/avatars/<file>.jpg)
 MEDIA_DIR = Path(os.getenv("MEDIA_DIR", Path(__file__).resolve().parent.parent / "media"))
 AVATAR_DIR = MEDIA_DIR / "avatars"

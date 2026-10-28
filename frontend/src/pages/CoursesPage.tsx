@@ -9,11 +9,12 @@ import CourseForm from "../components/CourseForm";
 import { JoinCourseForm } from "../components/CourseSharing";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
 
-/** Sidebar "Courses": every course, current semester first. Each card opens /courses/:id. */
+/** All courses, current semester first. Each card opens /courses/:id. */
 export default function CoursesPage() {
   const navigate = useNavigate();
   const { data, error, refetch } = useQuery<DashboardData>(DASHBOARD, { fetchPolicy: "cache-and-network" });
-  const { data: semData } = useQuery<SemestersData>(SEMESTERS, { fetchPolicy: "cache-and-network" });
+  const { data: semData, error: semError, refetch: refetchSemesters } =
+    useQuery<SemestersData>(SEMESTERS, { fetchPolicy: "cache-and-network" });
   const [adding, setAdding] = useState(false);
   const [joining, setJoining] = useState(false);
 
@@ -37,6 +38,7 @@ export default function CoursesPage() {
 
   const courses = data.dashboard.courses;
   const past = semesters.filter((s) => s.id !== sem?.id && s.courses.length > 0);
+  const formOpen = adding || joining;
 
   return (
     <AppShell
@@ -46,8 +48,16 @@ export default function CoursesPage() {
         <div className="space-y-8">
           <header>
             <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Courses</h1>
-            <p className="mt-1 text-sm text-slate-500">Open a course to see its stream, people and sharing.</p>
+            <p className="mt-1 text-sm text-slate-500">Open a course to see its stream, assignments, people and sharing.</p>
           </header>
+
+          {/* the dashboard failed on a refresh but we still have older data: say so */}
+          {error && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+              Could not refresh your courses.{" "}
+              <button onClick={() => refetch()} className="font-medium underline">Try again</button>
+            </p>
+          )}
 
           {!sem ? (
             <Card className="max-w-md">
@@ -60,7 +70,7 @@ export default function CoursesPage() {
                 <h2 id="current-heading" className="text-xl font-extrabold">
                   {sem.name} <span className="text-sm font-medium text-slate-500">· current</span>
                 </h2>
-                {!adding && !joining && (
+                {!formOpen && (
                   <div className="flex gap-2">
                     <Button variant="secondary" onClick={() => setJoining(true)}>Join with code</Button>
                     <Button onClick={() => setAdding(true)}>Add course</Button>
@@ -71,7 +81,7 @@ export default function CoursesPage() {
               {adding && <Card className="mt-4"><CourseForm onDone={() => setAdding(false)} /></Card>}
               {joining && <Card className="mt-4 max-w-md"><JoinCourseForm onDone={() => setJoining(false)} /></Card>}
 
-              {courses.length === 0 && !adding ? (
+              {courses.length === 0 && !formOpen ? (
                 <p className="mt-4 rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
                   No courses yet. Add your first course to get started.
                 </p>
@@ -83,14 +93,26 @@ export default function CoursesPage() {
             </section>
           )}
 
+          {semError && !semData && (
+            <p role="alert" className="text-sm text-slate-600">
+              Could not load your past semesters.{" "}
+              <button onClick={() => refetchSemesters()} className="font-medium underline">Try again</button>
+            </p>
+          )}
+
           {past.map((s) => (
             <section key={s.id} aria-label={s.name}>
-              <h2 className="text-lg font-extrabold">
-                {s.name}{" "}
-                <span className="text-sm font-medium text-slate-500">· {fmtDate(s.startDate)} to {fmtDate(s.endDate)}</span>
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-extrabold">
+                  {s.name}{" "}
+                  <span className="text-sm font-medium text-slate-500">· {fmtDate(s.startDate)} to {fmtDate(s.endDate)}</span>
+                </h2>
+                <Button variant="secondary" onClick={() => navigate("/", { state: { viewSemesterId: s.id } })}>
+                  Edit or delete semester
+                </Button>
+              </div>
               <ul className="mt-3 grid gap-4 sm:grid-cols-2">
-                {s.courses.map((c) => <CourseCard key={c.id} course={c} readOnly />)}
+                {s.courses.map((c) => <CourseCard key={c.id} course={c} />)}
               </ul>
             </section>
           ))}

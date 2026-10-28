@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { useAuth } from "../auth/AuthContext";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
+import { DELETE_SEMESTER } from "../graphql/files";
+import { DUE_SOON, TASKS } from "../graphql/tasks";
 import {
-  AppShell, Button, Card, LoadError, SemesterNav, SemesterSummary,
+  AppShell, Banner, Button, Card, LoadError, SemesterNav, SemesterSummary,
   fmtDate as fmt, semesterStats,
 } from "../components/AppShell";
 import CourseCard from "../components/CourseCard";
@@ -27,6 +29,12 @@ export default function DashboardPage() {
   const { data: semData } = useQuery<SemestersData>(SEMESTERS, { fetchPolicy: "cache-and-network" });
   const [adding, setAdding] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [deleteSemester] = useMutation<any>(DELETE_SEMESTER, {
+    // a deleted semester takes its courses with it, and tasks lose their course link
+    refetchQueries: ["Dashboard", "Semesters", TASKS, DUE_SOON],
+    awaitRefetchQueries: true,
+  });
 
   // The Profile page can send us here to open a past semester or the "new semester" form
   const nav = useLocation().state as { viewSemesterId?: string; newSemester?: boolean } | null;
@@ -48,6 +56,19 @@ export default function DashboardPage() {
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
+
+  async function removeSemester(s: { id: string; name: string }) {
+    if (!window.confirm(`Delete ${s.name} and all its courses? Your tasks stay, but lose their course link. This cannot be undone.`)) return;
+    setActionError("");
+    try {
+      await deleteSemester({ variables: { id: s.id } });
+      setViewingId(null);
+      setEditingSemester(false);
+    } catch (e) {
+      console.error(e);
+      setActionError("Could not delete the semester. Please try again.");
+    }
+  }
 
   if (!data) {
     return (
@@ -86,7 +107,7 @@ export default function DashboardPage() {
 
   const { progress, daysLeft, notStarted, ended } = semesterStats(shown);
   const banner = viewed
-    ? `${shown.name} (${fmt(shown.startDate)} to ${fmt(shown.endDate)}). You are viewing a past semester, so it is read-only.`
+    ? `${shown.name} (${fmt(shown.startDate)} to ${fmt(shown.endDate)}). You are viewing a past semester.`
     : notStarted ? `${shown.name} starts on ${fmt(shown.startDate)}. Get your courses ready.`
     : ended ? `${shown.name} has ended. Time to set up the next one.`
     : `${shown.name} is ${progress}% done with ${daysLeft} days to go. Keep it up!`;
@@ -127,6 +148,8 @@ export default function DashboardPage() {
             </div>
           </header>
 
+          {actionError && <Banner>{actionError}</Banner>}
+
           {startingSemester && (
             <Card role="region" aria-label="New semester" className="max-w-md">
               <h2 className="text-lg font-extrabold">Start a new semester</h2>
@@ -137,10 +160,10 @@ export default function DashboardPage() {
             </Card>
           )}
 
-          {editingSemester && !viewed && !startingSemester && (
+          {editingSemester && !startingSemester && (
             <Card role="region" aria-label="Edit semester" className="max-w-md">
               <h2 className="mb-4 text-lg font-extrabold">Edit semester</h2>
-              <SemesterForm key={sem.id} semester={sem} onDone={() => setEditingSemester(false)} />
+              <SemesterForm key={shown.id} semester={shown} onDone={() => setEditingSemester(false)} />
             </Card>
           )}
 
@@ -150,12 +173,15 @@ export default function DashboardPage() {
             {ended && !viewed && !startingSemester && (
               <Button className="mr-2 mt-4" onClick={() => setStartingSemester(true)}>Start new semester</Button>
             )}
-            {!viewed && !editingSemester && (
-              <Button variant="outline" className="mt-4"
+            {!editingSemester && (
+              <Button variant="outline" className="mr-2 mt-4"
                 onClick={() => { setStartingSemester(false); setEditingSemester(true); }}>
                 Edit semester
               </Button>
             )}
+            <Button variant="outline" className="mr-2 mt-4" onClick={() => removeSemester(shown)}>
+              Delete semester
+            </Button>
             {viewed && (
               <Button className="mt-4" onClick={() => setViewingId(null)}>Back to {sem.name}</Button>
             )}
@@ -192,7 +218,7 @@ export default function DashboardPage() {
               </p>
             ) : (
               <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-                {shownCourses.map((c) => <CourseCard key={c.id} course={c} readOnly={!!viewed} />)}
+                {shownCourses.map((c) => <CourseCard key={c.id} course={c} />)}
               </ul>
             )}
           </section>
