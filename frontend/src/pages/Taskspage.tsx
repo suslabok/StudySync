@@ -1,32 +1,62 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { AppShell, Banner, Button, Card, SemesterNav, SemesterSummary } from "../components/AppShell";
-import { TaskForm } from "../components/TaskWidgets";
-import { TaskWorkPanel } from "../components/TaskFiles";
+import { AppShell, Button, Card, SemesterNav, SemesterSummary } from "../components/AppShell";
+import { TaskForm, WorkSheet } from "../components/TaskWidgets";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
 import {
   DELETE_TASK, DUE_SOON, SET_TASK_STATUS, TASKS,
-  dueLabel, isOverdue, type TasksData,
+  dueLabel, isOverdue, type Task, type TasksData,
 } from "../graphql/tasks";
 
-type Filter = "open" | "done" | "all";
-
-function Tile({ value, label, alert = false }: { value: string; label: string; alert?: boolean }) {
+/** An assigned task: no tick box and no Start/Pause. Click it to read the instructions and do the work. */
+function AssignedRow({ task: t, open, onToggle, onDelete }: {
+  task: Task; open: boolean; onToggle: () => void; onDelete?: () => void;
+}) {
+  const handedIn = t.status === "done";
+  const late = !handedIn && isOverdue(t);
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-sm">
-      <p className={`text-2xl font-extrabold tracking-tight ${alert ? "text-red-600" : ""}`}>{value}</p>
-      <p className="mt-0.5 text-xs text-slate-500">{label}</p>
-    </div>
+    <li className="rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <button type="button" aria-expanded={open} onClick={onToggle}
+        className="flex w-full items-start gap-3 rounded-2xl p-4 text-left hover:bg-slate-50">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{t.title}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            {t.course && (
+              <span className="rounded-full px-2 py-0.5 font-semibold text-white" style={{ backgroundColor: t.course.color }}>{t.course.code}</span>
+            )}
+            <span className={late ? "font-semibold text-red-600" : "text-slate-500"}>{dueLabel(t.dueDate)}</span>
+            <span className={`rounded-full px-2 py-0.5 font-medium ${
+              handedIn ? "bg-emerald-100 text-emerald-800" : late ? "bg-red-100 text-red-700" : "bg-plum-800/10 text-plum-800"}`}>
+              {handedIn ? "Handed in" : late ? "Overdue" : "To hand in"}
+            </span>
+          </div>
+        </div>
+        <span aria-hidden="true" className={`mt-1 text-slate-400 transition ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <div className="space-y-5 border-t border-slate-100 p-4">
+          {t.notes ? <p className="whitespace-pre-wrap wrap-break-word text-sm text-slate-700">{t.notes}</p>
+            : <p className="text-sm text-slate-400">No instructions.</p>}
+          <WorkSheet taskId={t.id} assignmentId={t.assignmentId} />
+          {onDelete && (
+            <div className="border-t border-slate-100 pt-3 text-sm">
+              <button onClick={onDelete} className="rounded-lg px-2 py-1 text-red-600 hover:bg-red-50">Delete</button>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 
+type Filter = "open" | "done" | "all";
+
 export default function TasksPage() {
   const { data, error, refetch } = useQuery<TasksData>(TASKS, { fetchPolicy: "cache-and-network" });
-  const { data: dash } = useQuery<DashboardData>(DASHBOARD, { fetchPolicy: "cache-and-network" });
-
-  // Same side panels as the dashboard
   const navigate = useNavigate();
+  // Same side panels as the dashboard
+  const { data: dash } = useQuery<DashboardData>(DASHBOARD, { fetchPolicy: "cache-and-network" });
   const { data: semData } = useQuery<SemestersData>(SEMESTERS, { fetchPolicy: "cache-and-network" });
   const sem = dash?.dashboard.currentSemester ?? null;
   const semesterNav = sem && (
@@ -34,36 +64,20 @@ export default function TasksPage() {
       onSelect={(sid) => navigate("/", { state: sid === sem.id ? null : { viewSemesterId: sid } })}
       onNew={() => navigate("/", { state: { newSemester: true } })} />
   );
-  const sidePanel = dash ? <SemesterSummary shown={sem} courses={dash.dashboard.courses} /> : null;
   const [filter, setFilter] = useState<Filter>("open");
   const [courseFilter, setCourseFilter] = useState("all"); // "all" | "personal" | a course id
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [workId, setWorkId] = useState<string | null>(null); // the task whose Work panel is open
+  const [openId, setOpenId] = useState<string | null>(null); // the assigned task whose work is showing
   const refetchQueries = [TASKS, DUE_SOON];
   const [setStatus] = useMutation<any>(SET_TASK_STATUS, { refetchQueries });
   const [remove] = useMutation<any>(DELETE_TASK, { refetchQueries });
-  const [actionError, setActionError] = useState("");
-
-  /** Run a mutation and show a payload error or a network failure instead of ignoring it. */
-  async function run(p: Promise<any>) {
-    setActionError("");
-    try {
-      const { data: d } = await p;
-      const errs = (d && (Object.values(d)[0] as any))?.errors;
-      if (errs?.length) setActionError(errs[0].message);
-    } catch (e) {
-      console.error(e);
-      setActionError("Something went wrong. Please try again.");
-    }
-  }
 
   const all = data?.tasks ?? [];
   const inCourse = all.filter((t) =>
     courseFilter === "all" ? true : courseFilter === "personal" ? !t.course : t.course?.id === courseFilter);
   const open = inCourse.filter((t) => t.status !== "done");
   const done = inCourse.filter((t) => t.status === "done");
-  const overdue = inCourse.filter((t) => t.status !== "done" && isOverdue(t));
   const shown = filter === "open" ? open : filter === "done" ? done : inCourse;
   const courses = dash?.dashboard.courses ?? [];
 
@@ -80,14 +94,6 @@ export default function TasksPage() {
             </div>
             {!adding && <Button onClick={() => { setAdding(true); setEditingId(null); }}>Add task</Button>}
           </header>
-
-          <section aria-label="Overview" className="grid grid-cols-3 gap-3 sm:gap-4">
-            <Tile value={String(open.length)} label="Open" />
-            <Tile value={String(overdue.length)} label="Overdue" alert={overdue.length > 0} />
-            <Tile value={String(done.length)} label="Completed" />
-          </section>
-
-          {actionError && <Banner>{actionError}</Banner>}
 
           {adding && (
             <Card role="region" aria-label="New task" className="max-w-2xl"><TaskForm onDone={() => setAdding(false)} /></Card>
@@ -130,11 +136,15 @@ export default function TasksPage() {
               {shown.map((t) =>
                 editingId === t.id ? (
                   <li key={t.id}><Card className="max-w-2xl"><TaskForm task={t} onDone={() => setEditingId(null)} /></Card></li>
+                ) : t.assigned && t.assignmentId ? (
+                  <AssignedRow key={t.id} task={t} open={openId === t.id}
+                    onToggle={() => setOpenId(openId === t.id ? null : t.id)}
+                    onDelete={t.course ? undefined : () => { if (confirm(`Delete "${t.title}"?`)) remove({ variables: { id: t.id } }); }} />
                 ) : (
-                  <li key={t.id} className="flex flex-wrap items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <li key={t.id} className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                     <input type="checkbox" checked={t.status === "done"}
                       aria-label={`Mark "${t.title}" ${t.status === "done" ? "not done" : "done"}`}
-                      onChange={() => run(setStatus({ variables: { id: t.id, status: t.status === "done" ? "todo" : "done" } }))}
+                      onChange={() => setStatus({ variables: { id: t.id, status: t.status === "done" ? "todo" : "done" } })}
                       className="mt-1 h-5 w-5 shrink-0 accent-plum-800" />
                     <div className="min-w-0 flex-1">
                       <p className={`font-semibold ${t.status === "done" ? "text-slate-400 line-through" : ""}`}>{t.title}</p>
@@ -145,32 +155,22 @@ export default function TasksPage() {
                             {t.course.code}
                           </span>
                         )}
-                        {t.assigned && <span className="rounded-full bg-plum-800/10 px-2 py-0.5 font-medium text-plum-800">Assigned</span>}
-                        <span className={t.status !== "done" && isOverdue(t) ? "font-semibold text-red-600" : "text-slate-500"}>{dueLabel(t.dueDate)}</span>
+                        <span className={isOverdue(t) ? "font-semibold text-red-600" : "text-slate-500"}>{dueLabel(t.dueDate)}</span>
                         {t.status === "doing" && <span className="font-medium text-plum-800">In progress</span>}
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-1 text-sm">
-                      <button onClick={() => setWorkId(workId === t.id ? null : t.id)} aria-expanded={workId === t.id}
-                        className="rounded-lg px-2 py-1 text-plum-800 hover:bg-slate-100">
-                        {workId === t.id ? "Hide work" : "Work"}
-                      </button>
                       {t.status !== "done" && (
-                        <button onClick={() => run(setStatus({ variables: { id: t.id, status: t.status === "doing" ? "todo" : "doing" } }))}
+                        <button onClick={() => setStatus({ variables: { id: t.id, status: t.status === "doing" ? "todo" : "doing" } })}
                           className="rounded-lg px-2 py-1 text-slate-600 hover:bg-slate-100">
                           {t.status === "doing" ? "Pause" : "Start"}
                         </button>
                       )}
-                      {!t.assigned && (
-                        <button onClick={() => { setEditingId(t.id); setAdding(false); }}
-                          className="rounded-lg px-2 py-1 text-slate-600 hover:bg-slate-100">Edit</button>
-                      )}
-                      {(!t.assigned || !t.course) && (
-                        <button onClick={() => { if (window.confirm(`Delete "${t.title}"?`)) run(remove({ variables: { id: t.id } })); }}
-                          className="rounded-lg px-2 py-1 text-red-600 hover:bg-red-50">Delete</button>
-                      )}
+                      <button onClick={() => { setEditingId(t.id); setAdding(false); }}
+                        className="rounded-lg px-2 py-1 text-slate-600 hover:bg-slate-100">Edit</button>
+                      <button onClick={() => { if (confirm(`Delete "${t.title}"?`)) remove({ variables: { id: t.id } }); }}
+                        className="rounded-lg px-2 py-1 text-red-600 hover:bg-red-50">Delete</button>
                     </div>
-                    {workId === t.id && <div className="basis-full sm:pl-8"><TaskWorkPanel taskId={t.id} /></div>}
                   </li>
                 ),
               )}
@@ -178,8 +178,8 @@ export default function TasksPage() {
           )}
         </div>
       }
+      side={dash ? <SemesterSummary shown={sem} courses={dash.dashboard.courses} /> : null}
       semesterNav={semesterNav}
-      side={sidePanel}
     />
   );
 }

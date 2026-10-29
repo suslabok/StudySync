@@ -54,3 +54,15 @@ export const CREATE_COURSE = gql`
 export const DELETE_COURSE = gql`
   mutation DeleteCourse($id: ID!) { deleteCourse(id: $id) }
 `;
+export const UPDATE_COURSE = gql`
+  mutation UpdateCourse($id: ID!, $code: String!, $title: String!, $color: String) {
+    updateCourse(id: $id, code: $code, title: $title, color: $color) {
+      course { id code title color }
+      errors { field code message }
+    }
+  }
+`;
+
+export const DELETE_SEMESTER = gql`
+  mutation DeleteSemester($id: ID!) { deleteSemester(id: $id) }
+`;

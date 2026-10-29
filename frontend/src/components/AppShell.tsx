@@ -144,6 +144,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
   const onDashboard = pathname === "/";
   const onCourses = pathname.startsWith("/courses"); // course detail pages keep "Courses" highlighted
   const onTasks = pathname.startsWith("/tasks");
+  const onCalendar = pathname.startsWith("/calendar");
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col bg-plum-800 px-4 py-8 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start">
@@ -166,7 +167,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
           <NavItem icon="book" label="Courses" to="/courses" active={onCourses} />
           <NavItem icon="tasks" label="Tasks" to="/tasks" active={onTasks} />
           <NavItem icon="timer" label="Focus timer" soon />
-          <NavItem icon="calendar" label="Calendar" soon />
+          <NavItem icon="calendar" label="Calendar" to="/calendar" active={onCalendar} />
         </ul>
       </nav>
 

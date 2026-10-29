@@ -252,13 +252,15 @@ class Task(Base):
 
 
 class TaskFile(Base):
-    """A file attached to an assignment (by whoever set it) or to one student's task (their work)."""
+    """A file attached to a stream post, an assignment (by whoever set it) or one student's task (their work)."""
 
     __tablename__ = "task_file"
 
     __table_args__ = (
         CheckConstraint(
-            "(task_id IS NOT NULL) <> (assignment_id IS NOT NULL)",
+            "(CASE WHEN task_id IS NULL THEN 0 ELSE 1 END)"
+            " + (CASE WHEN assignment_id IS NULL THEN 0 ELSE 1 END)"
+            " + (CASE WHEN post_id IS NULL THEN 0 ELSE 1 END) = 1",
             name="ck_task_file_one_parent",
         ),
     )
@@ -273,10 +275,40 @@ class TaskFile(Base):
     assignment_id: Mapped[int | None] = mapped_column(
         ForeignKey("assignment.id", ondelete="CASCADE"), index=True
     )
+    post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("post.id", ondelete="CASCADE"), index=True
+    )
     storage_key: Mapped[str] = mapped_column(String(64), unique=True)  # random name on disk, never the user's
     original_name: Mapped[str] = mapped_column(String(255))
     mime_type: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Event(Base):
+    """Something the user puts on their own calendar: an exam, a break, an event."""
+
+    __tablename__ = "event"
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('event', 'exam', 'break')", name="ck_event_kind"),
+        CheckConstraint("end_date IS NULL OR end_date >= start_date", name="ck_event_dates"),
+        Index("ix_event_owner_start", "owner_id", "start_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE")
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    notes: Mapped[str | None] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(
+        String(10), default="event", server_default="event"
+    )
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date)  # NULL = a single day
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

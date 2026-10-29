@@ -1,7 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation } from "@apollo/client/react";
-import { CREATE_COURSE } from "../graphql/dashboard";
-import { UPDATE_COURSE } from "../graphql/files";
+import { CREATE_COURSE, UPDATE_COURSE } from "../graphql/dashboard";
 import { Banner, Button, toFieldErrors, type ApiError } from "./AppShell";
 import TextField from "./TextField";
 

@@ -6,6 +6,7 @@ import ProfilePage from "./pages/ProfilePage";
 import CoursePage from "./pages/CoursePages";
 import CoursesPage from "./pages/CoursesPage";
 import TasksPage from "./pages/Taskspage";
+import CalendarPage from "./pages/CalendarPage";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
   <Route path="/courses/:id" element={<CoursePage />} />
   <Route path="/courses" element={<CoursesPage />} />
   <Route path="/tasks" element={<TasksPage />} />
+  <Route path="/calendar" element={<CalendarPage />} />
 </Route>
     </Routes>
   );

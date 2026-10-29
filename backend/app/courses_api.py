@@ -27,7 +27,9 @@ extend type Mutation {
   createSemester(name: String!, startDate: Date!, endDate: Date!): SemesterPayload!
   updateSemester(id: ID!, name: String!, startDate: Date!, endDate: Date!): SemesterPayload!
   createCourse(code: String!, title: String!, color: String!): CoursePayload!
+  updateCourse(id: ID!, code: String!, title: String!, color: String): CoursePayload!
   deleteCourse(id: ID!): Boolean!
+  deleteSemester(id: ID!): Boolean!
 }
 """
 
@@ -96,12 +98,34 @@ def resolve_create_course(_, info, code, title, color=None):
         return {"course": course, "errors": []}
 
 
+@mutation.field("updateCourse")
+def resolve_update_course(_, info, id, code, title, color=None):
+    with SessionLocal() as db:
+        user = current_user(info, db)
+        try:
+            course = svc.update_course(db, user.id, id, code, title, color)
+        except ApiError as e:
+            return {"course": None, "errors": _errors(e)}
+        return {"course": course, "errors": []}
+
+
 @mutation.field("deleteCourse")
 def resolve_delete_course(_, info, id):
     with SessionLocal() as db:
         user = current_user(info, db)
         try:
             svc.delete_course(db, user.id, id)
+        except ApiError as e:
+            raise GraphQLError(e.message, extensions={"code": e.code})
+        return True
+
+
+@mutation.field("deleteSemester")
+def resolve_delete_semester(_, info, id):
+    with SessionLocal() as db:
+        user = current_user(info, db)
+        try:
+            svc.delete_semester(db, user.id, id)
         except ApiError as e:
             raise GraphQLError(e.message, extensions={"code": e.code})
         return True

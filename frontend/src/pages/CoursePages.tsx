@@ -3,10 +3,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { AppShell, Button, Card, LoadError, SemesterNav, SemesterSummary } from "../components/AppShell";
 import Avatar from "../components/Avatar";
-import { Assignments } from "../components/TaskWidgets";
 import Stream from "../components/CourseSharing";
+import { Assignments } from "../components/TaskWidgets";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
-import { ASSIGNMENTS, DUE_SOON, TASKS } from "../graphql/tasks";
 import {
   COURSE_SPACE, LEAVE_COURSE, REGENERATE_CODE, ROLE_LABEL, SHARE_COURSE, STOP_SHARING,
   type CourseSpace,
@@ -18,8 +17,7 @@ export default function CoursePage() {
   const { data, loading, error: loadError, refetch } = useQuery<{ courseSpace: CourseSpace | null }>(COURSE_SPACE, {
     variables: { courseId: id }, fetchPolicy: "cache-and-network",
   });
-  // sharing changes also add or drop the assignment tasks, so refresh those lists too
-  const opts = { refetchQueries: [COURSE_SPACE, DASHBOARD, SEMESTERS, TASKS, DUE_SOON, ASSIGNMENTS] };
+  const opts = { refetchQueries: [COURSE_SPACE, DASHBOARD, SEMESTERS] };
   const [share, { loading: sharing }] = useMutation<any>(SHARE_COURSE, opts);
   const [regen] = useMutation<any>(REGENERATE_CODE, opts);
   const [stop] = useMutation<any>(STOP_SHARING, opts);
@@ -58,22 +56,11 @@ export default function CoursePage() {
   }
 
   const linked = s.shared && !s.isOwner; // a course you joined
-  /** Run a mutation; show a payload error or network failure. Resolves true on success. */
-  async function run(p: Promise<any>): Promise<boolean> {
-    setError("");
-    try {
-      const { data: d } = await p;
-      const errs = (d && (Object.values(d)[0] as any))?.errors;
-      if (errs?.length) { setError(errs[0].message); return false; }
-      return true;
-    } catch (e) {
-      console.error(e);
-      setError("Something went wrong. Please try again.");
-      return false;
-    }
-  }
   async function startSharing(mode: "classroom" | "group") {
-    await run(share({ variables: { courseId: s!.courseId, mode } }));
+    setError("");
+    const { data } = await share({ variables: { courseId: s!.courseId, mode } });
+    const errs = data?.shareCourse.errors;
+    if (errs?.length) setError(errs[0].message);
   }
   async function copyCode() {
     try { await navigator.clipboard.writeText(s!.joinCode ?? ""); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard blocked */ }
@@ -114,22 +101,21 @@ export default function CoursePage() {
                   </button>
                 )}
                 {s.joinCode && s.isOwner && (
-                  <button onClick={() => { if (window.confirm("Make a new code? The old one stops working.")) run(regen({ variables: { courseId: s.courseId } })); }}
+                  <button onClick={() => { if (confirm("Make a new code? The old one stops working.")) regen({ variables: { courseId: s.courseId } }); }}
                     className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium hover:bg-slate-50">New code</button>
                 )}
                 {s.shared && s.isOwner && (
                   <button onClick={() => {
-                    if (window.confirm("Stop sharing? The stream and assignments are deleted and everyone keeps their own private copy of the course.")) run(stop({ variables: { courseId: s.courseId } }));
+                    if (confirm("Stop sharing? The stream is deleted and everyone keeps their own private copy of the course.")) stop({ variables: { courseId: s.courseId } });
                   }} className="rounded-lg border border-red-300 bg-white px-3 py-1.5 font-semibold text-red-600 hover:bg-red-50">Stop sharing</button>
                 )}
                 {linked && (
                   <Button variant="secondary" className="bg-white py-1.5 text-xs" onClick={async () => {
-                    if (!window.confirm(`Leave ${s.code}? You keep the course, but it stops following the class.`)) return;
-                    if (await run(leave({ variables: { courseId: s.courseId } }))) navigate("/");
+                    if (!confirm(`Leave ${s.code}? You keep the course, but it stops following the class.`)) return;
+                    await leave({ variables: { courseId: s.courseId } }); navigate("/");
                   }}>Leave class</Button>
                 )}
               </div>
-              {s.shared && error && <p role="alert" className="w-full text-xs text-red-700">{error}</p>}
             </Card>
           )}
 
@@ -171,7 +157,7 @@ export default function CoursePage() {
                 ))}
               </div>
               {tab === "stream" ? (
-                <Stream courseId={s.courseId} mode={s.mode ?? "classroom"} canPost={s.mode === "group" || s.isOwner} />
+                <Stream courseId={s.courseId} mode={s.mode ?? "classroom"} />
               ) : tab === "assignments" ? (
                 <Assignments courseId={s.courseId} canAssign={s.mode === "group" || s.isOwner} />
               ) : (

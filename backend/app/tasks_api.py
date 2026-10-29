@@ -14,11 +14,12 @@ type Task {
   dueDate: Date
   completedAt: String
   assigned: Boolean!
+  assignmentId: ID
   course: Course
 }
 
-input TaskInput { title: String!, notes: String, priority: Int!, dueDate: Date, courseId: ID }
-input AssignmentInput { title: String!, notes: String, priority: Int!, dueDate: Date }
+input TaskInput { title: String!, notes: String, priority: Int, dueDate: Date, courseId: ID }
+input AssignmentInput { title: String!, notes: String, priority: Int, dueDate: Date }
 
 type Assignment {
   id: ID!

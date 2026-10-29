@@ -3,14 +3,14 @@ import { gql } from "@apollo/client";
 
 const TASK_FIELDS = gql`
   fragment TaskFields on Task {
-    id title notes status priority dueDate completedAt assigned
+    id title notes status dueDate completedAt assigned assignmentId
     course { id code color }
   }
 `;
 
 const ASSIGNMENT_FIELDS = gql`
   fragment AssignmentFields on Assignment {
-    id title notes priority dueDate createdAt canEdit doneCount total myTaskId myStatus
+    id title notes dueDate createdAt canEdit doneCount total myTaskId myStatus
     author { id displayName }
   }
 `;
@@ -55,13 +55,13 @@ export const DELETE_ASSIGNMENT = gql`mutation DeleteAssignment($id: ID!) { delet
 export type TaskStatus = "todo" | "doing" | "done";
 
 export type Task = {
-  id: string; title: string; notes: string | null; status: TaskStatus; priority: 1 | 2 | 3;
-  dueDate: string | null; completedAt: string | null; assigned: boolean;
+  id: string; title: string; notes: string | null; status: TaskStatus;
+  dueDate: string | null; completedAt: string | null; assigned: boolean; assignmentId: string | null;
   course: { id: string; code: string; color: string } | null;
 };
 
 export type Assignment = {
-  id: string; title: string; notes: string | null; priority: 1 | 2 | 3; dueDate: string | null;
+  id: string; title: string; notes: string | null; dueDate: string | null;
   createdAt: string; canEdit: boolean; doneCount: number | null; total: number | null;
   myTaskId: string | null; myStatus: TaskStatus | null; author: { id: string; displayName: string };
 };
@@ -69,13 +69,6 @@ export type Assignment = {
 export type TasksData = { tasks: Task[] };
 export type DueSoonData = { dueSoon: Task[] };
 export type AssignmentsData = { assignments: Assignment[] };
-
-export const PRIORITY_LABEL = { 1: "Low", 2: "Medium", 3: "High" } as const;
-export const PRIORITY_STYLE: Record<number, string> = {
-  1: "bg-slate-100 text-slate-600",
-  2: "bg-sun-300/60 text-plum-900",
-  3: "bg-coral-400/40 text-plum-900",
-};
 
 const todayIso = () => {
   const d = new Date();

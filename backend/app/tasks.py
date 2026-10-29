@@ -4,11 +4,9 @@ An assigned task (assignment_id set) is managed by the assignment: its owner may
 change its status. Personal tasks are fully editable.
 """
 from datetime import date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
-
 
 from app.models import Assignment, Course, Task, User
 
@@ -17,22 +15,7 @@ STATUSES = ("todo", "doing", "done")
 
 class TaskError(Exception):
     def __init__(self, field: str | None, code: str, message: str):
-        super().__init__(message)
         self.field, self.code, self.message = field, code, message
-
-
-def _today(user: User) -> date:
-    """Today in the user's own timezone (needs the `tzdata` package on Windows)."""
-    try:
-        return datetime.now(ZoneInfo(user.timezone or "UTC")).date()
-    except (ZoneInfoNotFoundError, ValueError, KeyError):
-        return date.today()
-
-
-def _fresh(db: Session, task_id: int) -> Task:
-    """Reload a task with its course. Resolvers read task.course after the session closes,
-    and a lazy load on a closed session raises DetachedInstanceError."""
-    return db.scalars(select(Task).options(joinedload(Task.course)).where(Task.id == task_id)).unique().one()
 
 
 def clean_fields(data: dict) -> dict:
@@ -45,7 +28,7 @@ def clean_fields(data: dict) -> dict:
     notes = (data.get("notes") or "").strip() or None
     if notes and len(notes) > 5000:
         raise TaskError("notes", "TOO_LONG", "Notes are limited to 5000 characters.")
-    priority = data.get("priority", 2)
+    priority = data.get("priority") or 2     # the app no longer asks for one
     if priority not in (1, 2, 3):
         raise TaskError("priority", "INVALID", "Priority must be 1, 2 or 3.")
     due = data.get("due_date")
@@ -87,25 +70,19 @@ def _sort_key(t: Task):
 def list_tasks(db: Session, user: User, status: str | None = None, course_id=None) -> list[Task]:
     q = select(Task).options(joinedload(Task.course)).where(Task.owner_id == user.id)
     if status:
-        if status not in STATUSES:
-            raise TaskError("status", "INVALID", "Status must be todo, doing or done.")
         q = q.where(Task.status == status)
     if course_id not in (None, ""):
-        try:
-            q = q.where(Task.course_id == int(course_id))
-        except (TypeError, ValueError):
-            return []
+        q = q.where(Task.course_id == int(course_id))
     return sorted(db.scalars(q).unique().all(), key=_sort_key)
 
 
 def due_soon(db: Session, user: User, days: int = 7, limit: int = 5) -> list[Task]:
     """Open tasks that are overdue or due within `days` days."""
-    days, limit = min(max(0, days), 365), min(max(1, limit), 50)
-    horizon = _today(user) + timedelta(days=days)
+    horizon = date.today() + timedelta(days=max(0, days))
     q = (select(Task).options(joinedload(Task.course))
          .where(Task.owner_id == user.id, Task.status != "done",
                 Task.due_date.is_not(None), Task.due_date <= horizon))
-    return sorted(db.scalars(q).unique().all(), key=_sort_key)[:limit]
+    return sorted(db.scalars(q).unique().all(), key=_sort_key)[: max(1, limit)]
 
 
 def create_task(db: Session, user: User, data: dict) -> Task:
@@ -113,7 +90,8 @@ def create_task(db: Session, user: User, data: dict) -> Task:
     task = Task(owner_id=user.id, course_id=_own_course_id(db, user, data.get("course_id")), **fields)
     db.add(task)
     db.commit()
-    return _fresh(db, task.id)
+    db.refresh(task)
+    return task
 
 
 def update_task(db: Session, user: User, task_id, data: dict) -> Task:
@@ -124,19 +102,21 @@ def update_task(db: Session, user: User, task_id, data: dict) -> Task:
         setattr(task, k, v)
     task.course_id = _own_course_id(db, user, data.get("course_id"))
     db.commit()
-    return _fresh(db, task.id)
+    db.refresh(task)
+    return task
 
 
 def set_status(db: Session, user: User, task_id, status: str) -> Task:
     if status not in STATUSES:
         raise TaskError("status", "INVALID", "Status must be todo, doing or done.")
     task = get_task(db, user, task_id)
+    if task.assignment_id is not None:
+        raise TaskError("status", "ASSIGNED", "Hand in your work to finish assigned work.")
     task.status = status
     task.completed_at = datetime.now(timezone.utc) if status == "done" else None
-    if status != "done":
-        task.submitted_at = None          # moving it back to open withdraws the submission
     db.commit()
-    return _fresh(db, task.id)
+    db.refresh(task)
+    return task
 
 
 def delete_task(db: Session, user: User, task_id) -> None:
@@ -144,10 +124,8 @@ def delete_task(db: Session, user: User, task_id) -> None:
     # an assigned task can only go once its course link is gone (you deleted the course copy)
     if task.assignment_id is not None and task.course_id is not None:
         raise TaskError(None, "ASSIGNED", "Assigned work can't be deleted. Leave the course to remove it.")
-    keys = _files().keys_where(db, _files().TaskFile.task_id == task.id)
     db.delete(task)
     db.commit()
-    _files().remove_blobs(keys)
 
 
 # ---- hooks used by sharing.py (kept here so tasks.py never imports sharing) ----
@@ -159,52 +137,35 @@ def task_from_assignment(a: Assignment, owner_id: int, course_id: int | None) ->
 
 def give_member_assignments(db: Session, user: User, member_course: Course, root: Course) -> None:
     """A user just joined `root`: hand them every assignment already set on it."""
-    have = set(db.scalars(select(Task.assignment_id).where(
-        Task.owner_id == user.id, Task.assignment_id.is_not(None))))
     for a in db.scalars(select(Assignment).where(Assignment.course_id == root.id)):
-        if a.id not in have:
+        if db.scalar(select(Task.id).where(Task.owner_id == user.id, Task.assignment_id == a.id)) is None:
             db.add(task_from_assignment(a, user.id, member_course.id))
 
 
-def drop_member_assignments(db: Session, user: User, root_id: int) -> None:
-    """A user left `root`: remove their copies of its assignments."""
-    drop_member_assignments_for(db, user.id, root_id)
-
-
 def drop_member_assignments_for(db: Session, user_id: int, root_id: int) -> None:
-    """Same, by user id (used when a joined course is deleted). Also removes the files they handed in."""
+    """A user left `root`: remove their copies of its assignments."""
     mine = select(Assignment.id).where(Assignment.course_id == root_id)
-    theirs = select(Task.id).where(Task.owner_id == user_id, Task.assignment_id.in_(mine))
-    keys = _files().keys_where(db, _files().TaskFile.task_id.in_(theirs))
     db.query(Task).filter(Task.owner_id == user_id, Task.assignment_id.in_(mine)).delete(synchronize_session=False)
-    _files().remove_blobs(keys)
+
+
+def drop_member_assignments(db: Session, user: User, root_id: int) -> None:
+    drop_member_assignments_for(db, user.id, root_id)
 
 
 def drop_course_assignments(db: Session, root_id: int) -> None:
     """`root` stopped being shared: remove its assignments and everyone's copies."""
     mine = select(Assignment.id).where(Assignment.course_id == root_id)
-    tasks_of = select(Task.id).where(Task.assignment_id.in_(mine))
-    keys = _files().keys_where(db, or_(_files().TaskFile.assignment_id.in_(mine), _files().TaskFile.task_id.in_(tasks_of)))
     db.query(Task).filter(Task.assignment_id.in_(mine)).delete(synchronize_session=False)
     db.query(Assignment).filter(Assignment.course_id == root_id).delete(synchronize_session=False)
-    _files().remove_blobs(keys)
 
 
-# ---------------------------------------------------------------------------
 # Course assignments. classroom: only the owner (teacher) assigns, students receive.
 # group: any member assigns and everyone, the owner included, receives.
-# ---------------------------------------------------------------------------
 
 def _sh():
     """sharing.py imports this module, so import it lazily to avoid a cycle."""
     from app import sharing
     return sharing
-
-
-def _files():
-    """files.py imports this module, so import it lazily to avoid a cycle."""
-    from app import files
-    return files
 
 
 def _access(db: Session, user: User, course_id) -> tuple[Course, bool]:
@@ -303,9 +264,6 @@ def delete_assignment(db: Session, user: User, assignment_id) -> None:
     a, _, can_edit = _assignment_access(db, user, assignment_id)
     if not can_edit:
         raise TaskError(None, "FORBIDDEN", "Only whoever set this can delete it.")
-    tasks_of = select(Task.id).where(Task.assignment_id == a.id)
-    keys = _files().keys_where(db, or_(_files().TaskFile.assignment_id == a.id, _files().TaskFile.task_id.in_(tasks_of)))
     db.query(Task).filter(Task.assignment_id == a.id).delete(synchronize_session=False)
     db.delete(a)
     db.commit()
-    _files().remove_blobs(keys)

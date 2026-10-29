@@ -23,6 +23,7 @@ export const POSTS = gql`
     posts(courseId: $courseId) {
       id body createdAt canDelete
       author { ...PersonFields }
+      files { id name mimeType sizeBytes canDelete }
       comments { id body createdAt canDelete author { ...PersonFields } }
     }
   }
@@ -54,7 +55,11 @@ export const JOIN_COURSE = gql`
   ${SPACE_FIELDS}
 `;
 export const LEAVE_COURSE = gql`mutation LeaveCourse($courseId: ID!) { leaveCourse(courseId: $courseId) { ok ${ERRORS} } }`;
-export const CREATE_POST = gql`mutation CreatePost($courseId: ID!, $body: String!) { createPost(courseId: $courseId, body: $body) { ok ${ERRORS} } }`;
+export const CREATE_POST = gql`
+  mutation CreatePost($courseId: ID!, $body: String, $files: [FileUpload!]) {
+    createPost(courseId: $courseId, body: $body, files: $files) { ok ${ERRORS} }
+  }
+`;
 export const DELETE_POST = gql`mutation DeletePost($id: ID!) { deletePost(id: $id) { ok ${ERRORS} } }`;
 export const CREATE_COMMENT = gql`mutation CreateComment($postId: ID!, $body: String!) { createComment(postId: $postId, body: $body) { ok ${ERRORS} } }`;
 export const DELETE_COMMENT = gql`mutation DeleteComment($id: ID!) { deleteComment(id: $id) { ok ${ERRORS} } }`;
@@ -67,6 +72,9 @@ export type CourseSpace = {
   members: { role: string; joinedAt: string; user: Person }[];
 };
 export type StreamComment = { id: string; body: string; createdAt: string; canDelete: boolean; author: Person };
-export type StreamPost = { id: string; body: string; createdAt: string; canDelete: boolean; author: Person; comments: StreamComment[] };
+export type StreamPost = {
+  id: string; body: string; createdAt: string; canDelete: boolean; author: Person; comments: StreamComment[];
+  files: { id: string; name: string; mimeType: string; sizeBytes: number; canDelete: boolean }[];
+};
 
 export const ROLE_LABEL = { teacher: "Teacher", student: "Student", member: "Member" } as const;

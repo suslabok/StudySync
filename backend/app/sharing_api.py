@@ -23,6 +23,8 @@ type CourseSpace {
   members: [SpaceMember!]!
 }
 
+input FileUpload { name: String!, content: String! }   # content is base64
+
 type Comment { id: ID!, body: String!, createdAt: String!, author: Person!, canDelete: Boolean! }
 type Post { id: ID!, body: String!, createdAt: String!, author: Person!, canDelete: Boolean!, comments: [Comment!]! }
 
@@ -40,7 +42,7 @@ extend type Mutation {
   stopSharing(courseId: ID!): SpacePayload!
   joinCourse(code: String!): SpacePayload!
   leaveCourse(courseId: ID!): OkPayload!
-  createPost(courseId: ID!, body: String!): OkPayload!
+  createPost(courseId: ID!, body: String = "", files: [FileUpload!]): OkPayload!
   deletePost(id: ID!): OkPayload!
   createComment(postId: ID!, body: String!): OkPayload!
   deleteComment(id: ID!): OkPayload!
@@ -111,8 +113,8 @@ def resolve_leave(_, info, course_id):
 
 
 @mutation.field("createPost")
-def resolve_create_post(_, info, course_id, body):
-    return _run(info, lambda db, u: svc.create_post(db, u, course_id, body), "ok")
+def resolve_create_post(_, info, course_id, body="", files=None):
+    return _run(info, lambda db, u: svc.create_post(db, u, course_id, body, files), "ok")
 
 
 @mutation.field("deletePost")

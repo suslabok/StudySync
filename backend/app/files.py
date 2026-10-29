@@ -5,6 +5,7 @@ schema/resolvers. The TaskFile table class is in models.py so Alembic can see it
 Register it in api.py (files_api.type_defs, files_api.query, files_api.mutation).
 
 Who may do what:
+  * stream post files: everyone in the course can read; they go with the post (made in sharing.create_post).
   * assignment files: anyone in the course can read; whoever set the assignment can add or delete.
   * task files and answers: the task's owner can read, add and delete; the assignment's author and the
     course's teacher can read (that is how an assigner sees what others handed in); nobody else can.
@@ -17,7 +18,7 @@ import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ariadne import MutationType, QueryType
+from ariadne import MutationType, ObjectType, QueryType
 from graphql import GraphQLError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -138,6 +139,11 @@ def _int(value, message: str) -> int:
         raise TaskError(None, "NOT_FOUND", message)
 
 
+def _not_submitted(task: Task) -> None:
+    if task.submitted_at is not None:
+        raise TaskError(None, "SUBMITTED", "You already handed this in. Unsubmit it to change your work.")
+
+
 def _info(f: TaskFile, can_delete: bool) -> dict:
     return {"id": f.id, "name": f.original_name, "mime_type": f.mime_type,
             "size_bytes": f.size_bytes, "can_delete": can_delete}
@@ -163,11 +169,57 @@ def _file_access(db: Session, user: User, file_id) -> tuple[TaskFile, bool]:
     f = db.get(TaskFile, _int(file_id, "File not found."))
     if f is None:
         raise TaskError(None, "NOT_FOUND", "File not found.")
+    if f.post_id is not None:
+        sh = tsk._sh()
+        try:
+            sh._post_access(db, user, f.post_id)           # anyone in the course may read a post's files
+        except sh.ShareError:
+            raise TaskError(None, "NOT_FOUND", "File not found.")
+        return f, False                                    # a post's files go when the post is deleted
     if f.task_id is not None:
         _, owner = _task_view(db, user, f.task_id)
         return f, owner
     _, _, can_edit = tsk._assignment_access(db, user, f.assignment_id)
     return f, can_edit
+
+
+def decode_upload(name: str, content: str) -> tuple[str, str, bytes]:
+    """base64 -> (clean name, mime type, bytes), or TaskError on a bad upload."""
+    content = content or ""
+    if len(content) > MAX_BYTES * 4 // 3 + 8:           # reject before decoding a huge string
+        raise TaskError("file", "TOO_LARGE", f"Files can be up to {MAX_MB} MB.")
+    try:
+        data = base64.b64decode(content, validate=True)
+    except (binascii.Error, ValueError):
+        raise TaskError("file", "INVALID", "The file could not be read.")
+    try:
+        clean, mime = check_upload(name, data)
+    except FileProblem as e:
+        raise TaskError("file", e.code, e.message)
+    return clean, mime, data
+
+
+def check_many(uploads: list[dict] | None) -> list[tuple[str, str, bytes]]:
+    """Validate every upload of one post before anything is stored."""
+    uploads = uploads or []
+    if len(uploads) > MAX_FILES_PER_PARENT:
+        raise TaskError("file", "TOO_MANY", f"You can attach up to {MAX_FILES_PER_PARENT} files here.")
+    return [decode_upload(u.get("name"), u.get("content")) for u in uploads]
+
+
+def add_post_files(db: Session, user: User, post_id: int, checked: list[tuple[str, str, bytes]]) -> list[str]:
+    """Store validated files for a post (caller commits). Returns the disk keys so a failed commit can clean up."""
+    keys: list[str] = []
+    for clean, mime, data in checked:
+        key = save_blob(data)
+        keys.append(key)
+        db.add(TaskFile(uploader_id=user.id, post_id=post_id, storage_key=key, original_name=clean,
+                        mime_type=mime, size_bytes=len(data)))
+    return keys
+
+
+def post_file_keys(db: Session, post_id: int) -> list[str]:
+    return keys_where(db, TaskFile.post_id == post_id)
 
 
 # ---- files ----
@@ -187,6 +239,7 @@ def attach_file(db: Session, user: User, kind: str, parent_id, name: str, conten
         task, owner = _task_view(db, user, parent_id)
         if not owner:
             raise TaskError(None, "FORBIDDEN", "You can only attach files to your own work.")
+        _not_submitted(task)
         where, parent = TaskFile.task_id == task.id, {"task_id": task.id}
     else:
         a, _, can_edit = tsk._assignment_access(db, user, parent_id)
@@ -194,17 +247,7 @@ def attach_file(db: Session, user: User, kind: str, parent_id, name: str, conten
             raise TaskError(None, "FORBIDDEN", "Only whoever set this can attach files to it.")
         where, parent = TaskFile.assignment_id == a.id, {"assignment_id": a.id}
 
-    content = content or ""
-    if len(content) > MAX_BYTES * 4 // 3 + 8:           # reject before decoding a huge string
-        raise TaskError("file", "TOO_LARGE", f"Files can be up to {MAX_MB} MB.")
-    try:
-        data = base64.b64decode(content, validate=True)
-    except (binascii.Error, ValueError):
-        raise TaskError("file", "INVALID", "The file could not be read.")
-    try:
-        clean, mime = check_upload(name, data)
-    except FileProblem as e:
-        raise TaskError("file", e.code, e.message)
+    clean, mime, data = decode_upload(name, content)
     count = db.scalar(select(func.count()).select_from(TaskFile).where(where)) or 0
     if count >= MAX_FILES_PER_PARENT:
         raise TaskError("file", "TOO_MANY", f"You can attach up to {MAX_FILES_PER_PARENT} files here.")
@@ -226,6 +269,8 @@ def delete_file(db: Session, user: User, file_id) -> None:
     f, can_delete = _file_access(db, user, file_id)
     if not can_delete:
         raise TaskError(None, "FORBIDDEN", "You can't delete this file.")
+    if f.task_id is not None:
+        _not_submitted(db.get(Task, f.task_id))
     key = f.storage_key
     db.delete(f)
     db.commit()
@@ -252,14 +297,21 @@ def get_work(db: Session, user: User, task_id) -> dict:
     return _work(tsk.get_task(db, user, task_id))          # only the owner reads their own draft here
 
 
-def save_work(db: Session, user: User, task_id, answer: str | None, submit: bool = False) -> dict:
+def save_work(db: Session, user: User, task_id, answer: str | None, submit: bool = False,
+              unsubmit: bool = False) -> dict:
     task = tsk.get_task(db, user, task_id)
+    if unsubmit:
+        task.submitted_at, task.status, task.completed_at = None, "doing", None
+        db.commit()
+        return _work(task)
     if answer is not None:
+        _not_submitted(task)
         answer = answer.strip() or None
         if answer and len(answer) > MAX_ANSWER:
             raise TaskError("answer", "TOO_LONG", f"Keep the answer under {MAX_ANSWER} characters.")
         task.answer = answer
     if submit:
+        _not_submitted(task)
         files = db.scalar(select(func.count()).select_from(TaskFile).where(TaskFile.task_id == task.id)) or 0
         if not task.answer and not files:
             raise TaskError("answer", "REQUIRED", "Write an answer or attach a file first.")
@@ -300,6 +352,8 @@ type FileInfo { id: ID!, name: String!, mimeType: String!, sizeBytes: Int!, canD
 type FileContent { name: String!, mimeType: String!, content: String! }   # content is base64
 type FilePayload { file: FileInfo, errors: [UserError!]! }
 
+extend type Post { files: [FileInfo!]! }
+
 type TaskWork { taskId: ID!, status: String!, assigned: Boolean!, answer: String, submittedAt: String }
 type WorkPayload { work: TaskWork, errors: [UserError!]! }
 
@@ -322,12 +376,21 @@ extend type Query {
 extend type Mutation {
   attachFile(kind: FileParent!, parentId: ID!, name: String!, content: String!): FilePayload!
   deleteFile(id: ID!): OkPayload!
-  saveWork(taskId: ID!, answer: String, submit: Boolean = false): WorkPayload!
+  saveWork(taskId: ID!, answer: String, submit: Boolean = false, unsubmit: Boolean = false): WorkPayload!
 }
 """
 
 query = QueryType()
 mutation = MutationType()
+post_type = ObjectType("Post")
+
+
+@post_type.field("files")
+def resolve_post_files(post, _):
+    """Files on a stream post. The post list was already limited to people in the course."""
+    with SessionLocal() as db:
+        rows = db.scalars(select(TaskFile).where(TaskFile.post_id == int(post["id"])).order_by(TaskFile.id))
+        return [_info(f, False) for f in rows]
 
 
 def _read(info, fn):
@@ -384,5 +447,5 @@ def resolve_delete_file(_, info, id):
 
 
 @mutation.field("saveWork")
-def resolve_save_work(_, info, task_id, answer=None, submit=False):
-    return _write(info, lambda db, u: save_work(db, u, task_id, answer, submit), "work")
+def resolve_save_work(_, info, task_id, answer=None, submit=False, unsubmit=False):
+    return _write(info, lambda db, u: save_work(db, u, task_id, answer, submit, unsubmit), "work")

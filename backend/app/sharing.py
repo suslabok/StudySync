@@ -192,12 +192,29 @@ def list_posts(db: Session, user: User, course_id, limit: int = 50) -> list[dict
              "can_delete": owner or p.author_id == user.id, "comments": by_post[p.id]} for p, u in posts]
 
 
-def create_post(db: Session, user: User, course_id, body: str) -> None:
-    root, owner = _stream_access(db, user, course_id)
-    if root.share_mode == "classroom" and not owner:
-        raise ShareError(None, "FORBIDDEN", "Only the teacher can post announcements. You can comment on them.")
-    db.add(Post(course_id=root.id, author_id=user.id, body=_clean_body(body, 5000)))
-    db.commit()
+def create_post(db: Session, user: User, course_id, body: str, uploads: list[dict] | None = None) -> None:
+    """Anyone in the course can post, with text, files or both."""
+    from app import files as fs          # imported here: files.py needs this module, so not at the top
+    root, _ = _stream_access(db, user, course_id)
+    try:
+        checked = fs.check_many(uploads)
+    except fs.TaskError as e:
+        raise ShareError("files", e.code, e.message)
+    body = (body or "").strip()
+    if not body and not checked:
+        raise ShareError("body", "REQUIRED", "Write something or attach a file first.")
+    if body:
+        body = _clean_body(body, 5000)
+    post = Post(course_id=root.id, author_id=user.id, body=body)
+    db.add(post)
+    db.flush()
+    keys = fs.add_post_files(db, user, post.id, checked)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        fs.remove_blobs(keys)
+        raise
 
 
 def _post_access(db: Session, user: User, post_id) -> tuple[Post, bool]:
@@ -218,8 +235,11 @@ def delete_post(db: Session, user: User, post_id) -> None:
     post, owner = _post_access(db, user, post_id)
     if not owner and post.author_id != user.id:
         raise ShareError(None, "FORBIDDEN", "You can only delete your own posts.")
+    from app import files as fs
+    keys = fs.post_file_keys(db, post.id)
     db.delete(post)
     db.commit()
+    fs.remove_blobs(keys)
 
 
 def create_comment(db: Session, user: User, post_id, body: str) -> None:

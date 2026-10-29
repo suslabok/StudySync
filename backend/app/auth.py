@@ -45,7 +45,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     return _hasher.verify(password, password_hash)
 
 
-# ---------- access tokens ----------
+#  access tokens
 def create_access_token(user_id: int) -> str:
     now = _now()
     payload = {"sub": str(user_id), "type": "access", "iat": now,
