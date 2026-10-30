@@ -23,7 +23,7 @@ export type CalendarEvent = {
 export type Holiday = { date: string; name: string };
 
 export const KINDS: Record<EventKind, { label: string; color: string }> = {
-  event: { label: "Event", color: "#2563eb" },
-  exam: { label: "Exam", color: "#dc2626" },
-  break: { label: "Break", color: "#16a34a" },
+  event: { label: "Event", color: "#6f58a0" },
+  exam: { label: "Exam", color: "#d14d45" },
+  break: { label: "Break", color: "#5f8a45" },
 };

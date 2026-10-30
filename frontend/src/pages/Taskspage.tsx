@@ -52,6 +52,7 @@ function AssignedRow({ task: t, open, onToggle, onDelete }: {
 
 type Filter = "open" | "done" | "all";
 
+
 export default function TasksPage() {
   const { data, error, refetch } = useQuery<TasksData>(TASKS, { fetchPolicy: "cache-and-network" });
   const navigate = useNavigate();
@@ -90,7 +91,6 @@ export default function TasksPage() {
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Tasks</h1>
-              <p className="mt-1 text-sm text-slate-500">Work your teachers assign, plus your own to-dos.</p>
             </div>
             {!adding && <Button onClick={() => { setAdding(true); setEditingId(null); }}>Add task</Button>}
           </header>

@@ -1,10 +1,12 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation } from "@apollo/client/react";
-import { CREATE_COURSE, UPDATE_COURSE } from "../graphql/dashboard";
+import { CREATE_COURSE } from "../graphql/dashboard";
+import { UPDATE_COURSE } from "../graphql/files";
 import { Banner, Button, toFieldErrors, type ApiError } from "./AppShell";
 import TextField from "./TextField";
 
-const COLORS = ["#2563eb", "#7c3aed", "#db2777", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0891b2"];
+// plum first (the theme colour), then warm and muted tones that all read well with white text
+const COLORS = ["#4b3f5f", "#6f58a0", "#b84a72", "#d14d45", "#c4622d", "#a8741a", "#5f8a45", "#2a8579"];
 
 type CourseLite = { id: string; code: string; title: string; color: string };
 

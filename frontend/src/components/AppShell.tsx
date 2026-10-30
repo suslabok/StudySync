@@ -98,6 +98,9 @@ const PATHS = {
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
 } as const;
 
+/** Your logo. Put the image in /public and change this path if you rename it. */
+const LOGO_SRC = "/logo.png";
+
 function Icon({ name }: { name: keyof typeof PATHS }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -145,17 +148,13 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
   const onCourses = pathname.startsWith("/courses"); // course detail pages keep "Courses" highlighted
   const onTasks = pathname.startsWith("/tasks");
   const onCalendar = pathname.startsWith("/calendar");
+  const onFocus = pathname.startsWith("/focus");
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col bg-plum-800 px-4 py-8 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start">
       <Link to="/" aria-label="StudySync home"
         className="flex items-center gap-2.5 rounded-xl px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-sun-400">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-linear-to-br from-sun-400 to-coral-400 text-plum-900">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-          </svg>
-        </span>
+        <img src={LOGO_SRC} alt="" className="h-10 w-10 shrink-0 rounded-xl object-contain" />
         <span className="text-xl font-extrabold tracking-tight">StudySync</span>
       </Link>
 
@@ -166,7 +165,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
             : <NavItem icon="home" label="Dashboard" to="/" />}
           <NavItem icon="book" label="Courses" to="/courses" active={onCourses} />
           <NavItem icon="tasks" label="Tasks" to="/tasks" active={onTasks} />
-          <NavItem icon="timer" label="Focus timer" soon />
+          <NavItem icon="timer" label="Focus timer" to="/focus" active={onFocus} />
           <NavItem icon="calendar" label="Calendar" to="/calendar" active={onCalendar} />
         </ul>
       </nav>
@@ -261,7 +260,9 @@ export function AppShell({ main, side, semesterNav }: {
     <div id="top" className="min-h-screen bg-white text-plum-900 lg:flex">
       <Sidebar semesterNav={semesterNav} />
       <header className="flex h-16 items-center justify-between bg-plum-800 px-4 text-white lg:hidden">
-        <Link to="/" className="text-lg font-semibold tracking-tight">StudySync</Link>
+        <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <img src={LOGO_SRC} alt="" className="h-8 w-8 rounded-lg object-contain" />StudySync
+        </Link>
         <AccountMenu />
       </header>
       <main className="min-w-0 flex-1 p-5 sm:p-8 lg:px-10 lg:py-8">{main}</main>

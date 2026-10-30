@@ -15,6 +15,7 @@ import binascii
 import os
 import re
 import secrets
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -114,6 +115,46 @@ def remove_blobs(keys: list[str]) -> None:
                 pass
 
 
+SWEEP_EVERY = 6 * 3600      # at most one sweep every 6 hours per server process
+SWEEP_GRACE = 600           # never touch files younger than 10 minutes: they may be mid-upload
+_last_sweep = float("-inf")
+
+
+def sweep_orphans(db: Session) -> int:
+    """Delete files on disk that no row points at any more.
+
+    Deleting an assignment, task, post, course or semester removes the rows (the database cascades),
+    but not the stored files. This catches them all in one place. Returns how many it removed.
+    """
+    if not MEDIA_DIR.exists():
+        return 0
+    known = set(db.scalars(select(TaskFile.storage_key)))
+    cutoff = time.time() - SWEEP_GRACE
+    removed = 0
+    for path in MEDIA_DIR.iterdir():
+        if not (path.is_file() and _KEY.match(path.name)) or path.name in known:
+            continue
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed += 1
+        except OSError:
+            pass
+    return removed
+
+
+def maybe_sweep(db: Session) -> None:
+    """Run the sweep now and then, from the upload paths. Never lets a clean-up problem break an upload."""
+    global _last_sweep
+    if time.monotonic() - _last_sweep < SWEEP_EVERY:
+        return
+    _last_sweep = time.monotonic()
+    try:
+        sweep_orphans(db)
+    except Exception:
+        pass
+
+
 def keys_where(db: Session, condition) -> list[str]:
     """Storage keys of the files matching `condition`, collected before their rows are deleted."""
     return list(db.scalars(select(TaskFile.storage_key).where(condition)))
@@ -209,6 +250,8 @@ def check_many(uploads: list[dict] | None) -> list[tuple[str, str, bytes]]:
 
 def add_post_files(db: Session, user: User, post_id: int, checked: list[tuple[str, str, bytes]]) -> list[str]:
     """Store validated files for a post (caller commits). Returns the disk keys so a failed commit can clean up."""
+    if checked:
+        maybe_sweep(db)
     keys: list[str] = []
     for clean, mime, data in checked:
         key = save_blob(data)
@@ -252,6 +295,7 @@ def attach_file(db: Session, user: User, kind: str, parent_id, name: str, conten
     if count >= MAX_FILES_PER_PARENT:
         raise TaskError("file", "TOO_MANY", f"You can attach up to {MAX_FILES_PER_PARENT} files here.")
 
+    maybe_sweep(db)
     key = save_blob(data)
     f = TaskFile(uploader_id=user.id, storage_key=key, original_name=clean, mime_type=mime,
                  size_bytes=len(data), **parent)

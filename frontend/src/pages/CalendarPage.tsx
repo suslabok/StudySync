@@ -13,8 +13,8 @@ import { TASKS, dueLabel, isOverdue, type Task, type TasksData } from "../graphq
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MAX_CHIPS = 3;
-const HOLIDAY_COLOR = "#b45309";
-const SEMESTER_COLOR = "#7c3aed";
+const HOLIDAY_COLOR = "#a8741a";
+const SEMESTER_COLOR = "#4b3f5f";
 const TASK_COLOR = "#64748b";
 
 /** YYYY-MM-DD in local time, the same format the API uses. */
@@ -88,6 +88,9 @@ const statusNote = (t: Task) =>
 
 type Entry = { key: string; label: string; color: string; kind: "holiday" | "semester" | "event" | "task"; done?: boolean };
 
+/* ------------------------------------------------------------------ */
+/* the form for your own events                                       */
+/* ------------------------------------------------------------------ */
 
 function EventForm({ event, date, onDone }: { event?: CalendarEvent; date: string; onDone: () => void }) {
   const [title, setTitle] = useState(event?.title ?? "");
@@ -253,7 +256,10 @@ export default function CalendarPage() {
     return `${months} ${nepaliDigits(last.y)}`;
   }, [bsOn, cursor]);
 
+  const weekend = country === "NP" ? [6] : [0, 6];     // Nepal's weekly holiday is Saturday
   const title = new Date(cursor.year, cursor.month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const undated = (taskData?.tasks ?? []).filter((t) => !t.dueDate && t.status !== "done").length;
+
 
   const countries = useMemo(
     () => (countryData?.holidayCountries ?? []).map((c) => ({ code: c, name: countryName(c) })).sort((a, b) => a.name.localeCompare(b.name)),
@@ -263,10 +269,6 @@ export default function CalendarPage() {
   function go(delta: number) {
     const d = new Date(cursor.year, cursor.month + delta, 1);
     setCursor({ year: d.getFullYear(), month: d.getMonth() });
-  }
-  function goToday() {
-    setCursor({ year: today.getFullYear(), month: today.getMonth() });
-    setSelected(todayKey);
   }
   function pick(d: Date) {
     setSelected(iso(d));
@@ -294,10 +296,14 @@ export default function CalendarPage() {
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Calendar</h1>
+              {undated > 0 && (
+                <p className="mt-1 text-sm text-slate-500">
+                  <Link to="/tasks" className="underline">{undated} open task{undated === 1 ? "" : "s"} without a date</Link>
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => go(-1)} aria-label="Previous month">‹</Button>
-              <Button variant="secondary" onClick={goToday}>Today</Button>
               <Button variant="secondary" onClick={() => go(1)} aria-label="Next month">›</Button>
             </div>
           </header>
@@ -306,8 +312,9 @@ export default function CalendarPage() {
             <div className="flex flex-wrap gap-2" role="group" aria-label="Show on the calendar">
               {toggles.map(([key, label, color]) => (
                 <button key={key} type="button" aria-pressed={show[key]} onClick={() => setShow({ ...show, [key]: !show[key] })}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium transition ${
-                    show[key] ? "border-slate-300 bg-white text-slate-800" : "border-transparent bg-slate-100 text-slate-400"}`}>
+                  style={{ "--c": color } as CSSProperties}
+                  className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
+                    show[key] ? "border-(--c) bg-[color-mix(in_srgb,var(--c)_14%,white)] text-plum-900" : "border-transparent bg-slate-100 text-slate-400"}`}>
                   <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: show[key] ? color : "#cbd5e1" }} />
                   {label}
                 </button>
@@ -328,7 +335,6 @@ export default function CalendarPage() {
                 </button>
               )}
             <label className="flex items-center gap-2 text-sm text-slate-600">
-              Holidays of
               <select value={country} onChange={(e) => setCountry(e.target.value)}
                 className="max-w-48 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium">
                 <option value="">None</option>
@@ -343,14 +349,16 @@ export default function CalendarPage() {
             <LoadError what="calendar" onRetry={() => refetch()} />
           ) : (
             <>
-              <h2 className="flex flex-wrap items-baseline gap-x-3 text-lg font-bold" aria-live="polite">
+              <h2 className="flex flex-wrap items-baseline gap-x-3 text-2xl font-extrabold text-plum-900" aria-live="polite">
                 {title}
-                {bsTitle && <span className="text-base font-semibold text-slate-500">{bsTitle}</span>}
+                {bsTitle && <span lang="ne" className="text-lg font-bold text-[#d14d45]">{bsTitle}</span>}
               </h2>
 
-              <div role="grid" aria-label={title} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div role="row" className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-500">
-                  {WEEKDAYS.map((w) => <div key={w} role="columnheader" className="py-2">{w}</div>)}
+              <div role="grid" aria-label={title} className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-plum-800/10">
+                <div role="row" className="grid grid-cols-7 bg-coral-400 text-center text-sm font-semibold text-plum-900">
+                  {WEEKDAYS.map((w, i) => (
+                    <div key={w} role="columnheader" className={`py-3 ${weekend.includes(i) ? "text-white" : ""}`}>{w}</div>
+                  ))}
                 </div>
                 <div className="grid grid-cols-7">
                   {days.map((d, i) => {
@@ -364,15 +372,21 @@ export default function CalendarPage() {
                       <button key={key} type="button" role="gridcell" aria-selected={isSel}
                         aria-label={`${longDay(key)}${items.length ? `, ${items.map((e) => e.label).join(", ")}` : ""}`}
                         onClick={() => pick(d)}
-                        className={`flex min-h-16 flex-col items-stretch gap-1 border-slate-100 p-1.5 text-left transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-plum-800 sm:min-h-24 ${
-                          i % 7 !== 6 ? "border-r" : ""} ${i < 35 ? "border-b" : ""} ${isSel ? "bg-plum-800/5" : ""} ${inMonth ? "" : "bg-slate-50/60 text-slate-400"}`}>
+                        className={`flex min-h-20 flex-col items-stretch gap-1 border-plum-800/10 p-2 text-left transition hover:bg-sun-300/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-plum-800 sm:min-h-28 ${
+                          i % 7 !== 6 ? "border-r" : ""} ${i < 35 ? "border-b" : ""} ${
+                          isSel ? "bg-sun-300/50 ring-2 ring-inset ring-sun-400"
+                            : !inMonth ? "bg-slate-50"
+                              : isHoliday ? "bg-coral-400/15"
+                                : weekend.includes(d.getDay()) ? "bg-blush/50" : ""}`}>
                         <span className="flex items-start justify-between gap-1">
-                          <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${
-                            isToday ? "bg-plum-800 text-white" : isSel ? "ring-2 ring-plum-800" : isHoliday && inMonth ? "text-red-600" : ""}`}>
+                          <span className={`grid h-9 w-9 place-items-center rounded-full text-lg font-bold ${
+                            isToday ? "bg-coral-400 text-plum-900"
+                              : !inMonth ? "text-slate-300"
+                                : isHoliday ? "text-[#d14d45]" : "text-plum-900"}`}>
                             {d.getDate()}
                           </span>
                           {bsDays.has(key) && (
-                            <span lang="ne" className={`pt-1 text-[10px] leading-none ${inMonth ? "text-slate-500" : "text-slate-400"}`}>{bsDays.get(key)}</span>
+                            <span lang="ne" className={`pt-1.5 text-sm font-semibold leading-none ${inMonth ? "text-plum-800/60" : "text-slate-300"}`}>{bsDays.get(key)}</span>
                           )}
                         </span>
 
@@ -380,13 +394,13 @@ export default function CalendarPage() {
                         <span className="hidden space-y-1 sm:block">
                           {items.slice(0, MAX_CHIPS).map((e) => (
                             <span key={e.key} style={{ "--c": e.color } as CSSProperties}
-                              className={`block truncate rounded-md border-l-4 border-(--c) bg-[color-mix(in_srgb,var(--c)_12%,white)] px-1.5 py-0.5 text-[11px] font-medium text-slate-800 ${
+                              className={`block truncate rounded-md border-l-4 border-(--c) bg-[color-mix(in_srgb,var(--c)_12%,white)] px-1.5 py-0.5 text-xs font-medium text-slate-800 ${
                                 e.done ? "line-through opacity-60" : ""}`}>
                               {e.label}
                             </span>
                           ))}
                           {items.length > MAX_CHIPS && (
-                            <span className="block px-1 text-[11px] font-medium text-slate-500">+{items.length - MAX_CHIPS} more</span>
+                            <span className="block px-1 text-xs font-medium text-slate-500">+{items.length - MAX_CHIPS} more</span>
                           )}
                         </span>
                         <span className="flex flex-wrap gap-0.5 sm:hidden" aria-hidden="true">

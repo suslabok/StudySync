@@ -312,3 +312,32 @@ class Event(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class FocusSession(Base):
+    """One finished stretch of focused study, optionally tied to a course and a task."""
+
+    __tablename__ = "focus_session"
+
+    __table_args__ = (
+        CheckConstraint("seconds BETWEEN 1 AND 43200", name="ck_focus_seconds"),
+        CheckConstraint("planned_seconds BETWEEN 1 AND 43200", name="ck_focus_planned"),
+        Index("ix_focus_owner_started", "owner_id", "started_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE")
+    )
+    course_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course.id", ondelete="SET NULL"), index=True
+    )
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("task.id", ondelete="SET NULL"), index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    seconds: Mapped[int] = mapped_column(Integer)          # time actually focused
+    planned_seconds: Mapped[int] = mapped_column(Integer)  # what the timer was set to
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

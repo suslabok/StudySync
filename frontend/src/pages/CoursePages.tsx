@@ -131,7 +131,7 @@ export default function CoursePage() {
                     <button disabled={sharing} onClick={() => startSharing("classroom")}
                       className="rounded-xl border border-slate-300 p-4 text-left hover:border-plum-800 disabled:opacity-60">
                       <span className="font-semibold">Share as a classroom</span>
-                      <span className="mt-1 block text-xs text-slate-500">You are the teacher. Only you post; others comment.</span>
+                      <span className="mt-1 block text-xs text-slate-500">You are the teacher and set the assignments. Everyone can post and comment.</span>
                     </button>
                     <button disabled={sharing} onClick={() => startSharing("group")}
                       className="rounded-xl border border-slate-300 p-4 text-left hover:border-plum-800 disabled:opacity-60">
