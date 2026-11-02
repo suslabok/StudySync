@@ -14,7 +14,6 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy import SmallInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base, TimestampMixin
@@ -171,19 +170,9 @@ class Assignment(Base):
     )
     title: Mapped[str] = mapped_column(String(200))
     notes: Mapped[str | None] = mapped_column(Text)
-    priority: Mapped[int] = mapped_column(
-        SmallInteger, default=2, server_default=text("2")
-    )
     due_date: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "priority BETWEEN 1 AND 3",
-            name="ck_assignment_priority",
-        ),
     )
 
 
@@ -196,10 +185,6 @@ class Task(Base):
         CheckConstraint(
             "status IN ('todo', 'doing', 'done')",
             name="ck_task_status",
-        ),
-        CheckConstraint(
-            "priority BETWEEN 1 AND 3",
-            name="ck_task_priority",
         ),
         UniqueConstraint(
             "owner_id",
@@ -229,9 +214,6 @@ class Task(Base):
     status: Mapped[str] = mapped_column(
         String(10), default="todo", server_default="todo"
     )
-    priority: Mapped[int] = mapped_column(
-        SmallInteger, default=2, server_default=text("2")
-    )
     due_date: Mapped[date | None] = mapped_column(Date)
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
@@ -252,7 +234,7 @@ class Task(Base):
 
 
 class TaskFile(Base):
-    """A file attached to a stream post, an assignment (by whoever set it) or one student's task (their work)."""
+    """A file attached to a stream post, an assignment (by whoever set it), or one student's task (their work)."""
 
     __tablename__ = "task_file"
 
@@ -338,6 +320,32 @@ class FocusSession(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     seconds: Mapped[int] = mapped_column(Integer)          # time actually focused
     planned_seconds: Mapped[int] = mapped_column(Integer)  # what the timer was set to
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Notification(Base):
+    """Something that happened that one user should hear about (new work, a post, a reply, a new member)."""
+
+    __tablename__ = "notification"
+
+    __table_args__ = (
+        Index("ix_notification_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(20))      # assignment | post | comment | joined
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str | None] = mapped_column(String(300))
+    # The shared (root) course it happened in. Each reader's own course id is worked out when listing.
+    root_course_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course.id", ondelete="CASCADE")
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -24,6 +24,11 @@ export const ASSIGNMENTS = gql`
   ${ASSIGNMENT_FIELDS}
 `;
 
+export const ASSIGNED_BY_ME = gql`
+  query AssignedByMe { assignedByMe { ...AssignmentFields course { id code color } } }
+  ${ASSIGNMENT_FIELDS}
+`;
+
 export const CREATE_TASK = gql`
   mutation CreateTask($input: TaskInput!) { createTask(input: $input) { task { ...TaskFields } ${ERRORS} } }
   ${TASK_FIELDS}
@@ -65,6 +70,9 @@ export type Assignment = {
   createdAt: string; canEdit: boolean; doneCount: number | null; total: number | null;
   myTaskId: string | null; myStatus: TaskStatus | null; author: { id: string; displayName: string };
 };
+
+export type GivenAssignment = Assignment & { course: { id: string; code: string; color: string } };
+export type AssignedByMeData = { assignedByMe: GivenAssignment[] };
 
 export type TasksData = { tasks: Task[] };
 export type DueSoonData = { dueSoon: Task[] };

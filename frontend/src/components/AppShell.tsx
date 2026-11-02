@@ -4,6 +4,8 @@ import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
 import { useAuth } from "../auth/AuthContext";
 import Avatar from "./Avatar";
+import NotificationBell from "./Notificationbell";
+import SearchBox from "./Searchbox";
 import { DUE_SOON, dueLabel, isOverdue, type DueSoonData } from "../graphql/tasks";
 
 const BUTTON = {
@@ -98,7 +100,6 @@ const PATHS = {
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
 } as const;
 
-/** Your logo. Put the image in /public and change this path if you rename it. */
 const LOGO_SRC = "/logo.png";
 
 function Icon({ name }: { name: keyof typeof PATHS }) {
@@ -180,6 +181,28 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
   );
 }
 
+/** Bottom tab bar on phones, where the sidebar is hidden. */
+function MobileNav() {
+  const { pathname } = useLocation();
+  const items: { icon: keyof typeof PATHS; label: string; to: string; on: boolean }[] = [
+    { icon: "home", label: "Home", to: "/", on: pathname === "/" },
+    { icon: "book", label: "Courses", to: "/courses", on: pathname.startsWith("/courses") },
+    { icon: "tasks", label: "Tasks", to: "/tasks", on: pathname.startsWith("/tasks") },
+    { icon: "timer", label: "Focus", to: "/focus", on: pathname.startsWith("/focus") },
+    { icon: "calendar", label: "Calendar", to: "/calendar", on: pathname.startsWith("/calendar") },
+  ];
+  return (
+    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-20 flex border-t border-white/10 bg-plum-800 pb-[env(safe-area-inset-bottom)] lg:hidden">
+      {items.map((i) => (
+        <Link key={i.to} to={i.to} aria-current={i.on ? "page" : undefined}
+          className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium ${i.on ? "text-sun-400" : "text-white/75"}`}>
+          <Icon name={i.icon} />{i.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 /* Mobile header account dropdown (was AccountsMenu.tsx) */
 function AccountMenu() {
   const { user, signOut } = useAuth();
@@ -256,6 +279,7 @@ export function AppShell({ main, side, semesterNav }: {
   side?: ReactNode;
   semesterNav?: ReactNode;
 }) {
+  const [mobileSearch, setMobileSearch] = useState(false);
   return (
     <div id="top" className="min-h-screen bg-white text-plum-900 lg:flex">
       <Sidebar semesterNav={semesterNav} />
@@ -263,17 +287,32 @@ export function AppShell({ main, side, semesterNav }: {
         <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <img src={LOGO_SRC} alt="" className="h-8 w-8 rounded-lg object-contain" />StudySync
         </Link>
-        <AccountMenu />
+        <div className="flex items-center gap-1">
+          <button type="button" aria-label="Search" aria-expanded={mobileSearch} onClick={() => setMobileSearch((o) => !o)}
+            className="grid h-11 w-11 place-items-center rounded-full text-white hover:bg-white/10">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          </button>
+          <NotificationBell onDark /><AccountMenu />
+        </div>
       </header>
-      <main className="min-w-0 flex-1 p-5 sm:p-8 lg:px-10 lg:py-8">{main}</main>
+      {mobileSearch && (
+        <div className="bg-plum-800 px-4 pb-3 lg:hidden">
+          <SearchBox autoFocus wide onPick={() => setMobileSearch(false)} />
+        </div>
+      )}
+      <main className="min-w-0 flex-1 p-5 sm:p-8 lg:px-10 lg:py-8">
+        <div className="mb-6 hidden lg:block"><SearchBox variant="bar" /></div>
+        {main}
+      </main>
       <aside aria-label="Summary"
         className="shrink-0 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-80 lg:flex-col lg:self-start">
         {/* white strip with the profile, like the middle of the page; yellow starts below it */}
-        <div className="hidden justify-end bg-white px-5 py-3 lg:flex"><ProfileLink /></div>
-        <div className="bg-sun-300 p-5 sm:p-8 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:rounded-tl-3xl">
+        <div className="hidden items-center justify-end gap-2 bg-white px-5 py-3 lg:flex"><NotificationBell /><ProfileLink /></div>
+        <div className="bg-sun-300 p-5 pb-24 sm:p-8 sm:pb-24 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:rounded-tl-3xl lg:pb-8">
           {side}
         </div>
       </aside>
+      <MobileNav />
     </div>
   );
 }
@@ -319,7 +358,7 @@ export function SemesterNav({ semesters, current, shownId, startingSemester = fa
 }
 
 /** A white card for the yellow side panel, with an optional progress bar. */
-export function SideCard({ label, value, percent, note }: { label: string; value: string; percent?: number; note?: string }) {
+function SideCard({ label, value, percent, note }: { label: string; value: string; percent?: number; note?: string }) {
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm">
       <div className="flex items-baseline justify-between gap-2">

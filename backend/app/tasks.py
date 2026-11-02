@@ -28,16 +28,13 @@ def clean_fields(data: dict) -> dict:
     notes = (data.get("notes") or "").strip() or None
     if notes and len(notes) > 5000:
         raise TaskError("notes", "TOO_LONG", "Notes are limited to 5000 characters.")
-    priority = data.get("priority") or 2     # the app no longer asks for one
-    if priority not in (1, 2, 3):
-        raise TaskError("priority", "INVALID", "Priority must be 1, 2 or 3.")
     due = data.get("due_date")
     if isinstance(due, str):
         try:
             due = date.fromisoformat(due)
         except ValueError:
             raise TaskError("dueDate", "INVALID", "Use a valid date.")
-    return {"title": title, "notes": notes, "priority": priority, "due_date": due}
+    return {"title": title, "notes": notes, "due_date": due}
 
 
 def _own_course_id(db: Session, user: User, course_id) -> int | None:
@@ -63,8 +60,8 @@ def get_task(db: Session, user: User, task_id) -> Task:
 
 
 def _sort_key(t: Task):
-    # open first, then soonest due (no date last), then highest priority
-    return (t.status == "done", t.due_date is None, t.due_date or date.max, -t.priority, t.id)
+    # open first, then soonest due (no date last)
+    return (t.status == "done", t.due_date is None, t.due_date or date.max, t.id)
 
 
 def list_tasks(db: Session, user: User, status: str | None = None, course_id=None) -> list[Task]:
@@ -132,7 +129,7 @@ def delete_task(db: Session, user: User, task_id) -> None:
 
 def task_from_assignment(a: Assignment, owner_id: int, course_id: int | None) -> Task:
     return Task(owner_id=owner_id, course_id=course_id, assignment_id=a.id, title=a.title,
-                notes=a.notes, priority=a.priority, due_date=a.due_date)
+                notes=a.notes, due_date=a.due_date)
 
 
 def give_member_assignments(db: Session, user: User, member_course: Course, root: Course) -> None:
@@ -159,8 +156,10 @@ def drop_course_assignments(db: Session, root_id: int) -> None:
     db.query(Assignment).filter(Assignment.course_id == root_id).delete(synchronize_session=False)
 
 
+# ---------------------------------------------------------------------------
 # Course assignments. classroom: only the owner (teacher) assigns, students receive.
 # group: any member assigns and everyone, the owner included, receives.
+# ---------------------------------------------------------------------------
 
 def _sh():
     """sharing.py imports this module, so import it lazily to avoid a cycle."""
@@ -219,7 +218,7 @@ def _serialize(db: Session, user: User, items: list[Assignment], root: Course, o
         show = can_edit or root.share_mode == "group"   # students in a classroom don't see class progress
         t = mine.get(a.id)
         out.append({
-            "id": a.id, "title": a.title, "notes": a.notes, "priority": a.priority, "due_date": a.due_date,
+            "id": a.id, "title": a.title, "notes": a.notes, "due_date": a.due_date,
             "created_at": a.created_at.isoformat(), "author": _sh().person(authors[a.author_id]),
             "can_edit": can_edit,
             "done_count": counts[a.id]["done"] if show else None, "total": counts[a.id]["total"] if show else None,
@@ -235,6 +234,18 @@ def list_assignments(db: Session, user: User, course_id) -> list[dict]:
     return _serialize(db, user, items, root, owner)
 
 
+def list_given(db: Session, user: User) -> list[dict]:
+    """Work set on classes the user teaches. A teacher gets no task copy of it, so it is listed here instead."""
+    roots = db.scalars(select(Course).where(Course.owner_id == user.id, Course.share_mode == "classroom")).all()
+    out = []
+    for root in roots:
+        items = db.scalars(select(Assignment).where(Assignment.course_id == root.id)).all()
+        for row in _serialize(db, user, list(items), root, True):
+            out.append({**row, "course": root})
+    out.sort(key=lambda r: (r["due_date"] is None, r["due_date"] or date.max, r["title"].lower()))
+    return out
+
+
 def create_assignment(db: Session, user: User, course_id, data: dict) -> dict:
     root, owner = _access(db, user, course_id)
     if root.share_mode == "classroom" and not owner:
@@ -242,8 +253,12 @@ def create_assignment(db: Session, user: User, course_id, data: dict) -> dict:
     a = Assignment(course_id=root.id, author_id=user.id, **clean_fields(data))
     db.add(a)
     db.flush()
-    for uid, cid in _recipients(db, root):
+    recipients = _recipients(db, root)
+    for uid, cid in recipients:
         db.add(task_from_assignment(a, uid, cid))
+    from app import notifications as nt
+    nt.notify(db, [uid for uid, _ in recipients], "assignment", f"New in {root.code}: {a.title}",
+              f"Due {a.due_date:%b} {a.due_date.day}" if a.due_date else None, root_course_id=root.id, skip=user.id)
     db.commit()
     return _serialize(db, user, [a], root, owner)[0]
 

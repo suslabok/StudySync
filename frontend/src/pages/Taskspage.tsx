@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { AppShell, Button, Card, SemesterNav, SemesterSummary } from "../components/AppShell";
-import { TaskForm, WorkSheet } from "../components/TaskWidgets";
+import { GivenWork, TaskForm, WorkSheet } from "../components/TaskWidgets";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
 import {
-  DELETE_TASK, DUE_SOON, SET_TASK_STATUS, TASKS,
-  dueLabel, isOverdue, type Task, type TasksData,
+  ASSIGNED_BY_ME, DELETE_TASK, DUE_SOON, SET_TASK_STATUS, TASKS,
+  dueLabel, isOverdue, type AssignedByMeData, type Task, type TasksData,
 } from "../graphql/tasks";
 
 /** An assigned task: no tick box and no Start/Pause. Click it to read the instructions and do the work. */
@@ -50,7 +50,7 @@ function AssignedRow({ task: t, open, onToggle, onDelete }: {
   );
 }
 
-type Filter = "open" | "done" | "all";
+type Filter = "open" | "done" | "all" | "given";
 
 
 export default function TasksPage() {
@@ -65,6 +65,7 @@ export default function TasksPage() {
       onSelect={(sid) => navigate("/", { state: sid === sem.id ? null : { viewSemesterId: sid } })}
       onNew={() => navigate("/", { state: { newSemester: true } })} />
   );
+  const { data: givenData } = useQuery<AssignedByMeData>(ASSIGNED_BY_ME, { fetchPolicy: "cache-and-network" });
   const [filter, setFilter] = useState<Filter>("open");
   const [courseFilter, setCourseFilter] = useState("all"); // "all" | "personal" | a course id
   const [adding, setAdding] = useState(false);
@@ -81,8 +82,12 @@ export default function TasksPage() {
   const done = inCourse.filter((t) => t.status === "done");
   const shown = filter === "open" ? open : filter === "done" ? done : inCourse;
   const courses = dash?.dashboard.courses ?? [];
+  // Work you set on classes you teach. Teachers get no task copy of it, so it has its own tab.
+  const givenAll = givenData?.assignedByMe ?? [];
+  const given = givenAll.filter((a) => courseFilter === "all" ? true : a.course.id === courseFilter);
 
-  const tabs: [Filter, string, number][] = [["open", "Open", open.length], ["done", "Done", done.length], ["all", "All", inCourse.length]];
+  const tabs: [Filter, string, number][] = [["open", "Open", open.length], ["done", "Done", done.length], ["all", "All", inCourse.length],
+    ...(givenAll.length ? [["given", "Assigned by you", given.length] as [Filter, string, number]] : [])];
 
   return (
     <AppShell
@@ -120,7 +125,9 @@ export default function TasksPage() {
             </label>
           </div>
 
-          {error && !data ? (
+          {filter === "given" && givenAll.length ? (
+            <GivenWork items={given} />
+          ) : error && !data ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
               <p>Could not load your tasks.</p>
               <button onClick={() => refetch()} className="mt-2 font-medium underline">Try again</button>
@@ -141,7 +148,7 @@ export default function TasksPage() {
                     onToggle={() => setOpenId(openId === t.id ? null : t.id)}
                     onDelete={t.course ? undefined : () => { if (confirm(`Delete "${t.title}"?`)) remove({ variables: { id: t.id } }); }} />
                 ) : (
-                  <li key={t.id} className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <li key={t.id} className="flex flex-wrap items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-nowrap">
                     <input type="checkbox" checked={t.status === "done"}
                       aria-label={`Mark "${t.title}" ${t.status === "done" ? "not done" : "done"}`}
                       onChange={() => setStatus({ variables: { id: t.id, status: t.status === "done" ? "todo" : "done" } })}
@@ -159,7 +166,7 @@ export default function TasksPage() {
                         {t.status === "doing" && <span className="font-medium text-plum-800">In progress</span>}
                       </div>
                     </div>
-                    <div className="flex shrink-0 gap-1 text-sm">
+                    <div className="flex w-full shrink-0 gap-1 pl-8 text-sm sm:w-auto sm:pl-0">
                       {t.status !== "done" && (
                         <button onClick={() => setStatus({ variables: { id: t.id, status: t.status === "doing" ? "todo" : "doing" } })}
                           className="rounded-lg px-2 py-1 text-slate-600 hover:bg-slate-100">

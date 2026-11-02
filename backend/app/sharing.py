@@ -151,6 +151,8 @@ def join_course(db: Session, user: User, code: str) -> dict:
         db.add(existing)
         db.flush()
         task_svc.give_member_assignments(db, user, existing, root)  # work already set on the course
+        from app import notifications as nt
+        nt.notify(db, [root.owner_id], "joined", f"{user.display_name} joined {root.code}", root_course_id=root.id)
         db.commit()
     return space(db, user, existing.id)  # joining twice is harmless
 
@@ -209,6 +211,9 @@ def create_post(db: Session, user: User, course_id, body: str, uploads: list[dic
     db.add(post)
     db.flush()
     keys = fs.add_post_files(db, user, post.id, checked)
+    from app import notifications as nt
+    nt.notify(db, nt.course_members(db, root), "post", f"{user.display_name} posted in {root.code}",
+              body or "Shared a file", root_course_id=root.id, skip=user.id)
     try:
         db.commit()
     except Exception:
@@ -244,7 +249,12 @@ def delete_post(db: Session, user: User, post_id) -> None:
 
 def create_comment(db: Session, user: User, post_id, body: str) -> None:
     post, _ = _post_access(db, user, post_id)
-    db.add(Comment(post_id=post.id, author_id=user.id, body=_clean_body(body, 2000)))
+    body = _clean_body(body, 2000)
+    db.add(Comment(post_id=post.id, author_id=user.id, body=body))
+    from app import notifications as nt
+    root = db.get(Course, post.course_id)
+    nt.notify(db, [post.author_id], "comment", f"{user.display_name} replied to your post in {root.code}",
+              body, root_course_id=root.id, skip=user.id)
     db.commit()
 
 

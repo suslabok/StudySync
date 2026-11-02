@@ -10,7 +10,6 @@ type Task {
   title: String!
   notes: String
   status: String!
-  priority: Int!
   dueDate: Date
   completedAt: String
   assigned: Boolean!
@@ -18,14 +17,13 @@ type Task {
   course: Course
 }
 
-input TaskInput { title: String!, notes: String, priority: Int, dueDate: Date, courseId: ID }
-input AssignmentInput { title: String!, notes: String, priority: Int, dueDate: Date }
+input TaskInput { title: String!, notes: String, dueDate: Date, courseId: ID }
+input AssignmentInput { title: String!, notes: String, dueDate: Date }
 
 type Assignment {
   id: ID!
   title: String!
   notes: String
-  priority: Int!
   dueDate: Date
   createdAt: String!
   author: Person!
@@ -34,6 +32,7 @@ type Assignment {
   total: Int
   myTaskId: ID
   myStatus: String
+  course: Course
 }
 
 type TaskPayload { task: Task, errors: [UserError!]! }
@@ -43,6 +42,7 @@ extend type Query {
   tasks(status: String, courseId: ID): [Task!]!
   dueSoon(days: Int = 7, limit: Int = 5): [Task!]!
   assignments(courseId: ID!): [Assignment!]!
+  assignedByMe: [Assignment!]!
 }
 
 extend type Mutation {
@@ -94,6 +94,12 @@ def resolve_assignments(_, info, course_id):
             return svc.list_assignments(db, current_user(info, db), course_id)
         except svc.TaskError:
             return []
+
+
+@query.field("assignedByMe")
+def resolve_assigned_by_me(_, info):
+    with SessionLocal() as db:
+        return svc.list_given(db, current_user(info, db))
 
 
 def _run(info, fn, key: str):

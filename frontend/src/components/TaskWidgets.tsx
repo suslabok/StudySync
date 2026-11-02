@@ -9,9 +9,9 @@ import {
   type FileInfo, type Submission, type TaskWork,
 } from "../graphql/taskFiles";
 import {
-  ASSIGNMENTS, CREATE_ASSIGNMENT, CREATE_TASK, DELETE_ASSIGNMENT, DUE_SOON,
+  ASSIGNED_BY_ME, ASSIGNMENTS, CREATE_ASSIGNMENT, CREATE_TASK, DELETE_ASSIGNMENT, DUE_SOON,
   TASKS, UPDATE_ASSIGNMENT, UPDATE_TASK, dueLabel, isPastDue,
-  type Assignment, type AssignmentsData, type Task,
+  type Assignment, type AssignmentsData, type GivenAssignment, type Task,
 } from "../graphql/tasks";
 
 type Props = {
@@ -37,7 +37,7 @@ export function TaskForm({ task, assignment, assignTo, defaultDue, onDone }: Pro
   const [created, setCreated] = useState(false);       // saved, but some upload failed: don't save twice
   const [attach] = useMutation<any>(ATTACH_FILE, { refetchQueries: [FILES] });
 
-  const refetchQueries = [TASKS, DUE_SOON, ASSIGNMENTS];
+  const refetchQueries = [TASKS, DUE_SOON, ASSIGNMENTS, ASSIGNED_BY_ME];
   const [createTask, c1] = useMutation<any>(CREATE_TASK, { refetchQueries });
   const [updateTask, c2] = useMutation<any>(UPDATE_TASK, { refetchQueries });
   const [createAssignment, c3] = useMutation<any>(CREATE_ASSIGNMENT, { refetchQueries });
@@ -166,7 +166,7 @@ const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 /** Downloads a file the signed-in user may read. */
-export function useDownload() {
+function useDownload() {
   const client = useApolloClient();
   return async (file: { id: string }) => {
     try {
@@ -371,7 +371,7 @@ function SubmissionsList({ assignmentId }: { assignmentId: string }) {
 /** The Assignments tab of a shared course. `courseId` is the viewer's own course id. */
 export function Assignments({ courseId, canAssign }: { courseId: string; canAssign: boolean }) {
   const { data } = useQuery<AssignmentsData>(ASSIGNMENTS, { variables: { courseId }, fetchPolicy: "cache-and-network" });
-  const refetchQueries = [ASSIGNMENTS, TASKS, DUE_SOON];
+  const refetchQueries = [ASSIGNMENTS, ASSIGNED_BY_ME, TASKS, DUE_SOON];
   const [remove] = useMutation<any>(DELETE_ASSIGNMENT, { refetchQueries });
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -439,5 +439,50 @@ export function Assignments({ courseId, canAssign }: { courseId: string; canAssi
         </ul>
       )}
     </div>
+  );
+}
+
+/** Work you set on classes you teach: how many have handed in, and everyone's answers and files. */
+export function GivenWork({ items }: { items: GivenAssignment[] }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  if (items.length === 0) {
+    return <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">Nothing assigned yet.</p>;
+  }
+  return (
+    <ul className="space-y-3">
+      {items.map((a) => {
+        const open = openId === a.id;
+        return (
+          <li key={a.id} className="rounded-2xl border border-slate-100 bg-white shadow-sm">
+            <button type="button" aria-expanded={open} aria-controls={`given-${a.id}`}
+              onClick={() => setOpenId(open ? null : a.id)}
+              className="flex w-full items-start gap-3 rounded-2xl p-4 text-left hover:bg-slate-50">
+              <div className="min-w-0 flex-1">
+                <p className="wrap-break-word font-semibold">{a.title}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full px-2 py-0.5 font-semibold text-white" style={{ backgroundColor: a.course.color }}>{a.course.code}</span>
+                  <span className={isPastDue(a.dueDate) ? "font-semibold text-red-600" : "text-slate-500"}>{dueLabel(a.dueDate)}</span>
+                  {a.total !== null && a.doneCount !== null && (
+                    <span className="rounded-full bg-plum-800/10 px-2 py-0.5 font-medium text-plum-800">{a.doneCount} of {a.total} handed in</span>
+                  )}
+                </div>
+              </div>
+              <span aria-hidden="true" className={`mt-1 text-slate-400 transition ${open ? "rotate-180" : ""}`}>▾</span>
+            </button>
+            {open && (
+              <div id={`given-${a.id}`} className="space-y-5 border-t border-slate-100 p-4">
+                {a.notes ? <p className="whitespace-pre-wrap wrap-break-word text-sm text-slate-700">{a.notes}</p>
+                  : <p className="text-sm text-slate-400">No instructions.</p>}
+                <ParentFiles kind="ASSIGNMENT" parentId={a.id} title="Files" canAttach={a.canEdit} />
+                <SubmissionsList assignmentId={a.id} />
+                <p className="border-t border-slate-100 pt-3 text-sm text-slate-500">
+                  To edit or delete it, open the course and go to Assignments.
+                </p>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

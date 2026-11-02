@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { AppShell, Button, Card, LoadError, SemesterNav, SemesterSummary } from "../components/AppShell";
 import Avatar from "../components/Avatar";
@@ -22,7 +22,8 @@ export default function CoursePage() {
   const [regen] = useMutation<any>(REGENERATE_CODE, opts);
   const [stop] = useMutation<any>(STOP_SHARING, opts);
   const [leave] = useMutation<any>(LEAVE_COURSE, opts);
-  const [tab, setTab] = useState<"stream" | "assignments" | "people">("stream");
+  const [params] = useSearchParams();                // search results link here with ?tab=assignments
+  const [tab, setTab] = useState<"stream" | "assignments" | "people">(params.get("tab") === "assignments" ? "assignments" : "stream");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 

@@ -335,6 +335,7 @@ export default function CalendarPage() {
                 </button>
               )}
             <label className="flex items-center gap-2 text-sm text-slate-600">
+              Holidays of
               <select value={country} onChange={(e) => setCountry(e.target.value)}
                 className="max-w-48 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium">
                 <option value="">None</option>
@@ -386,7 +387,10 @@ export default function CalendarPage() {
                             {d.getDate()}
                           </span>
                           {bsDays.has(key) && (
-                            <span lang="ne" className={`pt-1.5 text-sm font-semibold leading-none ${inMonth ? "text-plum-800/60" : "text-slate-300"}`}>{bsDays.get(key)}</span>
+                            <span lang="ne" className={`pt-1.5 text-xs font-semibold leading-none sm:text-sm ${inMonth ? "text-plum-800/60" : "text-slate-300"}`}>
+                              {bsDays.get(key)!.split(" ")[0]}
+                              {bsDays.get(key)!.includes(" ") && <span className="hidden sm:inline"> {bsDays.get(key)!.split(" ")[1]}</span>}
+                            </span>
                           )}
                         </span>
 
