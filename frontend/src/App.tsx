@@ -8,6 +8,8 @@ import CoursesPage from "./pages/CoursesPage";
 import TasksPage from "./pages/Taskspage";
 import CalendarPage from "./pages/CalendarPage";
 import FocusPage from "./pages/FocusPage";
+import StudyPage from "./pages/StudyPage";
+import StudyMaterialPage from "./pages/studymaterialpage";
 
 export default function App() {
   return (
@@ -22,7 +24,9 @@ export default function App() {
   <Route path="/tasks" element={<TasksPage />} />
   <Route path="/calendar" element={<CalendarPage />} />
 <Route path="/focus" element={<FocusPage />} />
-</Route>
+  <Route path="/study" element={<StudyPage />} />
+  <Route path="/study/:id" element={<StudyMaterialPage />} />
+      </Route>
     </Routes>
   );
 }

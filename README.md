@@ -22,6 +22,9 @@ A study planner and classroom app. Plan your semester, track tasks and deadlines
 - Stored on disk under `media/`, tracked in the database, downloaded through the API.
 - Orphaned files are swept automatically (6-hour rate limit, 10-minute grace period).
 
+**Search**
+- Full-text search (PostgreSQL) over your tasks, plus the stream posts, comments and assignments of courses you belong to. Results are ranked with highlighted snippets. Quotes, `-exclude` and `OR` work. You never see anyone else's private tasks.
+
 **Calendar**
 - Month view of task due dates, public holidays (offline, any supported country, English or Nepali names), your own events, exams and breaks.
 - Optional **Bikram Sambat (Nepali) dates** next to each day, with Nepal's Saturday weekend.
@@ -36,6 +39,13 @@ A study planner and classroom app. Plan your semester, track tasks and deadlines
 - Bell with an unread count, top-right on desktop and in the mobile header.
 - Notified when: new work is assigned, someone posts in your course, someone replies to your post, someone joins your course.
 - Due-soon reminders (overdue, due today, due within two days) are computed from your tasks in your timezone. No scheduler is needed.
+
+**Study** (learning and testing)
+- Add material by pasting text or uploading a PDF, Word, PowerPoint, text file or image. Only the extracted text is stored.
+- Generates a summary, key points and terms, a multiple-choice quiz, flashcards and short-answer questions.
+- Quizzes are marked on the server (answers are never sent to the browser before you submit). Short answers are marked by AI, or by keyword matching without it.
+- Flashcards remember which ones you find hard. Every quiz and short-answer round is saved, with a score chart per material.
+- Uses Google's free Gemini API when `GEMINI_API_KEY` is set, and a basic built-in generator otherwise. Reading images and scanned PDFs needs the key.
 
 **Accounts**
 - Email and password and Google sign-in, JWT access and refresh tokens, profile with avatar.
@@ -67,6 +77,7 @@ backend/app/
   agenda.py           holidays and personal calendar events
   focus.py            focus session log
   notifications.py    notifications and due-soon reminders
+  search.py           full-text search
   profile.py / profile_api.py       profile and avatar
 frontend/src/
   graphql/            gql documents and types (tasks, taskFiles, sharing, agenda, focus, notifications, dashboard)
@@ -86,7 +97,7 @@ Python 3.11+, Node 20+, PostgreSQL.
 cd backend
 python -m venv .venv
 .venv\Scripts\activate            # Windows (macOS/Linux: source .venv/bin/activate)
-pip install -r requirements.txt   
+pip install -r requirements.txt   # includes holidays
 python -m alembic upgrade head
 python -m uvicorn app.main:app --reload
 ```
@@ -94,12 +105,21 @@ python -m uvicorn app.main:app --reload
 ### Frontend
 ```bash
 cd frontend
-npm install                      
+npm install                       # includes nepali-date-converter
 npm run dev
 ```
 
 ### Configuration (`.env`, never commit it)
-Keep your existing database URL, JWT secret and Google client ID settings. 
+Keep your existing database URL, JWT secret and Google client ID settings. These are optional:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MEDIA_DIR` | `media` | Where uploaded files are stored |
+| `MAX_UPLOAD_MB` | `5` | Largest single upload |
+| `GEMINI_API_KEY` | none | Free key from https://aistudio.google.com/apikey. Without it, Study uses basic mode |
+| `GEMINI_MODEL` | `gemini-flash-latest` | Any Gemini model your key can use |
+
+Free Gemini keys have daily limits, and Google may use free-tier prompts to improve its products, so don't upload private material you wouldn't want reviewed. Each user is limited to 12 AI generations an hour so one person can't use up the quota.
 
 Use a long random JWT secret. If one was ever shared or committed, rotate it.
 
@@ -111,15 +131,27 @@ python -m alembic upgrade head
 Always open the generated file and check it before upgrading.
 
 ### Routes
-`/` dashboard, `/courses`, `/courses/:id`, `/tasks`, `/calendar`, `/focus`, `/profile`.
+`/` dashboard, `/courses`, `/courses/:id`, `/tasks`, `/calendar`, `/focus`, `/study`, `/study/:id`, `/search`, `/profile`.
 
 ## GraphQL overview
 
-- **Queries:** `semesters`, `dashboard`, `tasks`, `dueSoon`, `assignments`, `courseSpace`, `posts`, `files`, `fileContent`, `taskWork`, `submissions`, `events`, `holidays`, `holidayCountries`, `focusSessions`, `notifications`
+- **Queries:** `semesters`, `dashboard`, `tasks`, `dueSoon`, `assignments`, `courseSpace`, `posts`, `files`, `fileContent`, `taskWork`, `submissions`, `events`, `holidays`, `holidayCountries`, `focusSessions`, `notifications`, `assignedByMe`, `search`
 - **Mutations:** `createSemester`, `updateSemester`, `deleteSemester`, `createCourse`, `updateCourse`, `deleteCourse`, `createTask`, `updateTask`, `setTaskStatus`, `deleteTask`, `createAssignment`, `updateAssignment`, `deleteAssignment`, `saveWork`, `attachFile`, `deleteFile`, `shareCourse`, `regenerateJoinCode`, `stopSharing`, `joinCourse`, `leaveCourse`, `createPost`, `deletePost`, `createComment`, `deleteComment`, `createEvent`, `updateEvent`, `deleteEvent`, `logFocusSession`, `deleteFocusSession`, `markNotificationRead`, `markAllNotificationsRead`
 
 ## Design notes
 
 - **Theme:** dark plum sidebar, white main area, yellow right panel, coral accents. Colours are tokens in `index.css` (`plum-800/900`, `sun-300/400`, `coral-400`, `blush`).
 - **Tailwind v4:** use the canonical class names (`wrap-break-word`, `border-(--c)`, `bg-linear-to-br`).
+- **Uploads:** an extension allow-list, a check that the file's first bytes match its type, a size cap (5 MB) and a per-item limit. Files are stored under random names.
 - **Security:** every query and mutation checks ownership or course membership. Users outside a course get "not found". Files are served only to people who can see their parent item, and stored under random names, never the uploaded filename.
+- **Logo:** put your image in `public/` and set `LOGO_SRC` at the top of `AppShell.tsx`.
+
+## Before you deploy
+
+- **Rotate secrets:** use a long random JWT secret. If one was ever pasted into chat, a screenshot or a commit, treat it as leaked and replace it. Same for the database password.
+- **Keep `.env` out of git:** the included `.gitignore` covers `.env`, `.venv`, `node_modules` and `media/`. If `.env` was ever committed, remove it from the history, not just the latest commit.
+- **HTTPS only,** and restrict the API's allowed origins (CORS) to your real frontend address.
+- **Google sign-in:** add your production domain to the allowed origins of the Google client.
+- **Uploads:** `media/` must be on persistent storage and backed up. Move to object storage before running more than one server.
+- **Database:** run `python -m alembic upgrade head` on every deploy, and back up PostgreSQL.
+- **Turn off auto-reload** (`--reload`) and debug settings in production.

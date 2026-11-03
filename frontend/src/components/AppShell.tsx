@@ -4,8 +4,8 @@ import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
 import { useAuth } from "../auth/AuthContext";
 import Avatar from "./Avatar";
-import NotificationBell from "./Notificationbell";
-import SearchBox from "./Searchbox";
+import NotificationBell from "./NotificationBell";
+import SearchBox from "./SearchBox";
 import { DUE_SOON, dueLabel, isOverdue, type DueSoonData } from "../graphql/tasks";
 
 const BUTTON = {
@@ -95,6 +95,7 @@ const PATHS = {
   user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   book: "M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 5v16",
   tasks: "M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h9",
+  study: "M12 3 2 8l10 5 10-5-10-5zM6 10.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-5.5",
   timer: "M12 8v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",
   calendar: "M7 3v4M17 3v4M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
@@ -150,6 +151,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
   const onTasks = pathname.startsWith("/tasks");
   const onCalendar = pathname.startsWith("/calendar");
   const onFocus = pathname.startsWith("/focus");
+  const onStudy = pathname.startsWith("/study");
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col bg-plum-800 px-4 py-8 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start">
@@ -166,6 +168,7 @@ function Sidebar({ semesterNav }: { semesterNav?: ReactNode }) {
             : <NavItem icon="home" label="Dashboard" to="/" />}
           <NavItem icon="book" label="Courses" to="/courses" active={onCourses} />
           <NavItem icon="tasks" label="Tasks" to="/tasks" active={onTasks} />
+          <NavItem icon="study" label="Study" to="/study" active={onStudy} />
           <NavItem icon="timer" label="Focus timer" to="/focus" active={onFocus} />
           <NavItem icon="calendar" label="Calendar" to="/calendar" active={onCalendar} />
         </ul>
@@ -188,6 +191,7 @@ function MobileNav() {
     { icon: "home", label: "Home", to: "/", on: pathname === "/" },
     { icon: "book", label: "Courses", to: "/courses", on: pathname.startsWith("/courses") },
     { icon: "tasks", label: "Tasks", to: "/tasks", on: pathname.startsWith("/tasks") },
+    { icon: "study", label: "Study", to: "/study", on: pathname.startsWith("/study") },
     { icon: "timer", label: "Focus", to: "/focus", on: pathname.startsWith("/focus") },
     { icon: "calendar", label: "Calendar", to: "/calendar", on: pathname.startsWith("/calendar") },
   ];
@@ -280,6 +284,7 @@ export function AppShell({ main, side, semesterNav }: {
   semesterNav?: ReactNode;
 }) {
   const [mobileSearch, setMobileSearch] = useState(false);
+  const showSearch = useLocation().pathname === "/";      // search lives on the dashboard only
   return (
     <div id="top" className="min-h-screen bg-white text-plum-900 lg:flex">
       <Sidebar semesterNav={semesterNav} />
@@ -288,20 +293,22 @@ export function AppShell({ main, side, semesterNav }: {
           <img src={LOGO_SRC} alt="" className="h-8 w-8 rounded-lg object-contain" />StudySync
         </Link>
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="Search" aria-expanded={mobileSearch} onClick={() => setMobileSearch((o) => !o)}
-            className="grid h-11 w-11 place-items-center rounded-full text-white hover:bg-white/10">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-          </button>
+          {showSearch && (
+            <button type="button" aria-label="Search" aria-expanded={mobileSearch} onClick={() => setMobileSearch((o) => !o)}
+              className="grid h-11 w-11 place-items-center rounded-full text-white hover:bg-white/10">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            </button>
+          )}
           <NotificationBell onDark /><AccountMenu />
         </div>
       </header>
-      {mobileSearch && (
+      {showSearch && mobileSearch && (
         <div className="bg-plum-800 px-4 pb-3 lg:hidden">
           <SearchBox autoFocus wide onPick={() => setMobileSearch(false)} />
         </div>
       )}
       <main className="min-w-0 flex-1 p-5 sm:p-8 lg:px-10 lg:py-8">
-        <div className="mb-6 hidden lg:block"><SearchBox variant="bar" /></div>
+        {showSearch && <div className="mb-6 hidden lg:block"><SearchBox variant="bar" /></div>}
         {main}
       </main>
       <aside aria-label="Summary"
@@ -463,23 +470,22 @@ export function SemesterSummary({ shown, courses, viewed = false }: {
         <h3 className="text-sm font-bold">Your progress</h3>
         <div className="mt-3 space-y-3">
           <SemesterStatsCards progress={progress} elapsedDays={elapsedDays} totalDays={totalDays}
-            daysLeft={daysLeft} timeLeftNote={timeLeftNote} count={courses.length} name={shown.name} />
+            daysLeft={daysLeft} timeLeftNote={timeLeftNote} />
         </div>
       </div>
     </div>
   );
 }
 
-function SemesterStatsCards({ progress, elapsedDays, totalDays, daysLeft, timeLeftNote, count, name }: {
+function SemesterStatsCards({ progress, elapsedDays, totalDays, daysLeft, timeLeftNote }: {
   progress: number; elapsedDays: number; totalDays: number; daysLeft: number;
-  timeLeftNote: string; count: number; name: string;
+  timeLeftNote: string;
 }) {
   return (
     <>
       <SideCard label="Semester progress" value={`${progress}%`} percent={progress}
         note={`${elapsedDays} of ${totalDays} days`} />
       <SideCard label="Time left" value={`${daysLeft}d`} percent={100 - progress} note={timeLeftNote} />
-      <SideCard label="Courses" value={String(count)} note={name} />
     </>
   );
 }
