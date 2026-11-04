@@ -59,10 +59,9 @@ function AddMaterial() {
   }
 
   return (
-    <Card className="max-w-2xl border-t-4 border-t-coral-400">
+    <Card className="border-t-4 border-t-coral-400">
       <h2 className="text-lg font-bold">Add study material</h2>
-      <p className="mt-1 text-sm text-slate-500">Paste your notes or upload a file. We'll turn it into notes, a quiz and flashcards.</p>
-      <form onSubmit={submit} noValidate className="mt-4 space-y-4">
+      <form onSubmit={submit} noValidate className="mt-5 space-y-4">
         <TextField label="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={150}
           placeholder="e.g. Photosynthesis, chapter 4" error={errors.title} />
 
@@ -93,9 +92,6 @@ function AddMaterial() {
               <span className="min-w-0 break-all text-sm text-slate-600">{file ? file.name : `PDF, Word, PowerPoint, text or image, up to ${maxMb} MB`}</span>
             </div>
             {errors.file && <p role="alert" className="mt-1.5 text-sm text-red-600">{errors.file}</p>}
-            {cfg && !cfg.studyConfig.aiEnabled && (
-              <p className="mt-2 text-xs text-slate-500">Images and scanned PDFs need the AI key to be set up. Text-based files work without it.</p>
-            )}
           </div>
         )}
 
@@ -134,7 +130,6 @@ function MaterialRow({ m, i }: { m: Material; i: number }) {
 export default function StudyPage() {
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useQuery<any>(STUDY_MATERIALS);
-  const { data: cfg } = useQuery<any>(STUDY_CONFIG);
   const items: Material[] = data?.studyMaterials ?? [];
   const { data: dash } = useQuery<DashboardData>(DASHBOARD, { fetchPolicy: "cache-and-network" });
   const { data: semData } = useQuery<SemestersData>(SEMESTERS, { fetchPolicy: "cache-and-network" });
@@ -149,14 +144,6 @@ export default function StudyPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Study</h1>
-        <p className="mt-1 text-sm text-slate-500">Upload your material, get notes, then test yourself.</p>
-        {cfg && (
-          <p className="mt-3 max-w-2xl rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600">
-            {cfg.studyConfig.aiEnabled
-              ? "AI is on: questions and marking come from Gemini."
-              : "AI is off on this server, so questions are made in basic mode (simpler fill-in-the-blank style)."}
-          </p>
-        )}
       </header>
       <AddMaterial />
       <section aria-labelledby="mine">

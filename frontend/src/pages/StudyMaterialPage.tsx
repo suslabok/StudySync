@@ -15,16 +15,15 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 const CHOICE = ["A", "B", "C", "D"];
 
-/* ------------------------------ notes ------------------------------ */
 function Notes({ m }: { m: Material }) {
   const n = m.notes!;
   return (
     <div className="space-y-5">
       {n.summary && (
-        <section className="rounded-3xl bg-sun-300 p-6 text-plum-900 shadow-sm">
-          <h3 className="inline-block rounded-full bg-coral-400 px-3 py-0.5 text-xs font-bold uppercase tracking-wide">Summary</h3>
-          <p className="mt-3 leading-relaxed">{n.summary}</p>
-        </section>
+        <Card className="border-t-4 border-t-sun-400">
+          <h3 className="font-bold">Summary</h3>
+          <p className="mt-2 leading-relaxed">{n.summary}</p>
+        </Card>
       )}
       {n.points.length > 0 && (
         <Card className="border-t-4 border-t-coral-400"><h3 className="font-bold">Key points</h3>
@@ -41,7 +40,6 @@ function Notes({ m }: { m: Material }) {
   );
 }
 
-/* ------------------------------ quiz ------------------------------ */
 function Quiz({ id }: { id: string }) {
   const { data, loading, error, refetch } = useQuery<any>(STUDY_QUESTIONS, { variables: { materialId: id, kind: "mcq" }, fetchPolicy: "cache-and-network" });
   const [submit, { loading: sending }] = useMutation<any>(SUBMIT_QUIZ, { refetchQueries: [STUDY_ATTEMPTS, STUDY_MATERIAL, STUDY_MATERIALS] });
@@ -317,36 +315,36 @@ export default function StudyMaterialPage() {
   }
 
   const main = (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Link to="/study" className="text-sm font-medium text-plum-800 hover:underline">← All material</Link>
       {error ? <LoadError what="this material" onRetry={() => refetch()} />
         : loading && !data ? <p className="text-sm text-slate-500">Loading…</p>
         : !m ? <Card><p className="font-semibold">Material not found</p><p className="mt-1 text-sm text-slate-500">It may have been deleted.</p></Card>
         : (
           <>
-            <section className="space-y-5 rounded-3xl bg-coral-400 p-5 text-plum-900 shadow-sm sm:p-6">
-              <header className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className="wrap-break-word text-2xl font-extrabold tracking-tight sm:text-3xl">{m.title}</h1>
-                  <p className="mt-1 text-sm font-medium text-plum-800">
-                    {m.sourceKind === "file" ? m.fileName : "Pasted text"} · {m.charCount.toLocaleString()} characters
-                    {m.generatedBy && <> · made by {m.generatedBy === "ai" ? "AI" : "basic mode"}</>}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={regenerate} disabled={generating}>{generating ? "Working…" : m.generatedAt ? "Regenerate" : "Generate"}</Button>
-                  <Button variant="outline" onClick={del}>Delete</Button>
-                </div>
-              </header>
-              {m.generatedAt && (
-                <dl className="grid grid-cols-2 gap-3 text-center sm:grid-cols-5">
-                  {([["Questions", m.questionCount], ["Short answer", m.shortCount], ["Flashcards", m.cardCount], ["Attempts", m.attempts],
-                     ["Best score", m.bestPercent !== null ? `${m.bestPercent}%` : "none yet"]] as const).map(([k, v]) => (
-                    <div key={k} className="rounded-2xl bg-white/40 p-3"><dd className="text-xl font-extrabold">{v}</dd><dt className="text-xs font-medium text-plum-800">{k}</dt></div>
-                  ))}
-                </dl>
-              )}
-            </section>
+            <header className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="wrap-break-word text-2xl font-extrabold tracking-tight sm:text-3xl">{m.title}</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  {m.sourceKind === "file" ? m.fileName : "Pasted text"} · {m.charCount.toLocaleString()} characters
+                  {m.generatedBy && <> · made by {m.generatedBy === "ai" ? "AI" : "basic mode"}</>}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={regenerate} disabled={generating}>{generating ? "Working…" : m.generatedAt ? "Regenerate" : "Generate"}</Button>
+                <Button variant="secondary" onClick={del} className="text-red-600">Delete</Button>
+              </div>
+            </header>
+            {m.generatedAt && (
+              <dl className="grid grid-cols-2 gap-3 text-center sm:grid-cols-5">
+                {([["Questions", m.questionCount], ["Short answer", m.shortCount], ["Flashcards", m.cardCount], ["Attempts", m.attempts],
+                   ["Best score", m.bestPercent !== null ? `${m.bestPercent}%` : "none yet"]] as const).map(([k, v], i) => (
+                  <div key={k} className={`rounded-2xl p-3 ${["bg-blush", "bg-sun-300/40", "bg-blush", "bg-sun-300/40", "bg-blush"][i]}`}>
+                    <dd className="text-xl font-extrabold">{v}</dd><dt className="text-xs font-medium text-plum-800">{k}</dt>
+                  </div>
+                ))}
+              </dl>
+            )}
             {notice && <Banner kind={noticeBad ? "error" : "ok"}>{notice}</Banner>}
             {genError && <Banner>{genError}</Banner>}
             {!m.generatedAt ? (
@@ -364,7 +362,7 @@ export default function StudyMaterialPage() {
                         tab === t.id ? "bg-coral-400 text-plum-900 shadow-sm" : "bg-sun-300/40 text-plum-900 hover:bg-sun-300/70"}`}>{t.label}</button>
                   ))}
                 </div>
-                <div role="tabpanel" className="max-w-3xl">
+                <div role="tabpanel">
                   {tab === "notes" && m.notes && <Notes m={m} />}
                   {tab === "quiz" && <Quiz id={id} />}
                   {tab === "cards" && <Cards id={id} />}

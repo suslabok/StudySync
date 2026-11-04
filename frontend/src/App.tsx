@@ -9,7 +9,7 @@ import TasksPage from "./pages/Taskspage";
 import CalendarPage from "./pages/CalendarPage";
 import FocusPage from "./pages/FocusPage";
 import StudyPage from "./pages/StudyPage";
-import StudyMaterialPage from "./pages/studymaterialpage";
+import StudyMaterialPage from "./pages/StudyMaterialPage";
 
 export default function App() {
   return (

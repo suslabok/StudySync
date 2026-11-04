@@ -88,9 +88,6 @@ const statusNote = (t: Task) =>
 
 type Entry = { key: string; label: string; color: string; kind: "holiday" | "semester" | "event" | "task"; done?: boolean };
 
-/* ------------------------------------------------------------------ */
-/* the form for your own events                                       */
-/* ------------------------------------------------------------------ */
 
 function EventForm({ event, date, onDone }: { event?: CalendarEvent; date: string; onDone: () => void }) {
   const [title, setTitle] = useState(event?.title ?? "");
@@ -166,10 +163,6 @@ function EventForm({ event, date, onDone }: { event?: CalendarEvent; date: strin
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* the page                                                           */
-/* ------------------------------------------------------------------ */
-
 export default function CalendarPage() {
   const navigate = useNavigate();
   const today = new Date();
@@ -184,6 +177,11 @@ export default function CalendarPage() {
   const [show, setShow] = useState({ tasks: true, holidays: true, events: true });
 
   const days = useMemo(() => monthGrid(cursor.year, cursor.month), [cursor]);
+  // only the weeks that have days of this month (5 rows most months, not always 6)
+  const gridDays = useMemo(() => {
+    const lastIn = days.reduce((n, d, i) => (d.getMonth() === cursor.month ? i : n), 0);
+    return days.slice(0, (Math.floor(lastIn / 7) + 1) * 7);
+  }, [days, cursor]);
   const from = iso(days[0]);
   const to = iso(days[41]);
   const years = [...new Set([days[0].getFullYear(), days[41].getFullYear()])];
@@ -258,7 +256,6 @@ export default function CalendarPage() {
 
   const weekend = country === "NP" ? [6] : [0, 6];     // Nepal's weekly holiday is Saturday
   const title = new Date(cursor.year, cursor.month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  const undated = (taskData?.tasks ?? []).filter((t) => !t.dueDate && t.status !== "done").length;
 
 
   const countries = useMemo(
@@ -296,11 +293,6 @@ export default function CalendarPage() {
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Calendar</h1>
-              {undated > 0 && (
-                <p className="mt-1 text-sm text-slate-500">
-                  <Link to="/tasks" className="underline">{undated} open task{undated === 1 ? "" : "s"} without a date</Link>
-                </p>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => go(-1)} aria-label="Previous month">‹</Button>
@@ -352,42 +344,43 @@ export default function CalendarPage() {
             <>
               <h2 className="flex flex-wrap items-baseline gap-x-3 text-2xl font-extrabold text-plum-900" aria-live="polite">
                 {title}
-                {bsTitle && <span lang="ne" className="text-lg font-bold text-[#d14d45]">{bsTitle}</span>}
+                {bsTitle && <span lang="ne" className="text-lg font-bold text-slate-500">{bsTitle}</span>}
               </h2>
 
               <div role="grid" aria-label={title} className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-plum-800/10">
-                <div role="row" className="grid grid-cols-7 bg-coral-400 text-center text-sm font-semibold text-plum-900">
-                  {WEEKDAYS.map((w, i) => (
-                    <div key={w} role="columnheader" className={`py-3 ${weekend.includes(i) ? "text-white" : ""}`}>{w}</div>
+                <div role="row" className="grid grid-cols-7 border-b border-plum-800/10 bg-slate-50 text-center text-sm font-semibold text-plum-800">
+                  {WEEKDAYS.map((w) => (
+                    <div key={w} role="columnheader" className="py-3">{w}</div>
                   ))}
                 </div>
                 <div className="grid grid-cols-7">
-                  {days.map((d, i) => {
+                  {gridDays.map((d, i) => {
                     const key = iso(d);
                     const items = byDay.get(key) ?? [];
                     const isHoliday = items.some((e) => e.kind === "holiday");
                     const inMonth = d.getMonth() === cursor.month;
                     const isToday = key === todayKey;
                     const isSel = key === selected;
+                    if (!inMonth) {            // days of the neighbouring months are left blank
+                      return <div key={key} aria-hidden="true" className={`min-h-20 border-plum-800/10 bg-slate-50/60 sm:min-h-28 ${
+                        i % 7 !== 6 ? "border-r" : ""} ${i < gridDays.length - 7 ? "border-b" : ""}`} />;
+                    }
                     return (
                       <button key={key} type="button" role="gridcell" aria-selected={isSel}
                         aria-label={`${longDay(key)}${items.length ? `, ${items.map((e) => e.label).join(", ")}` : ""}`}
                         onClick={() => pick(d)}
-                        className={`flex min-h-20 flex-col items-stretch gap-1 border-plum-800/10 p-2 text-left transition hover:bg-sun-300/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-plum-800 sm:min-h-28 ${
-                          i % 7 !== 6 ? "border-r" : ""} ${i < 35 ? "border-b" : ""} ${
-                          isSel ? "bg-sun-300/50 ring-2 ring-inset ring-sun-400"
-                            : !inMonth ? "bg-slate-50"
-                              : isHoliday ? "bg-coral-400/15"
-                                : weekend.includes(d.getDay()) ? "bg-blush/50" : ""}`}>
+                        className={`flex min-h-20 flex-col items-stretch gap-1 border-plum-800/10 p-2 text-left transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-plum-800 sm:min-h-28 ${
+                          i % 7 !== 6 ? "border-r" : ""} ${i < gridDays.length - 7 ? "border-b" : ""} ${
+                          isSel ? "bg-slate-100 ring-2 ring-inset ring-plum-800/40"
+                            : weekend.includes(d.getDay()) ? "bg-slate-50/70" : ""}`}>
                         <span className="flex items-start justify-between gap-1">
                           <span className={`grid h-9 w-9 place-items-center rounded-full text-lg font-bold ${
-                            isToday ? "bg-coral-400 text-plum-900"
-                              : !inMonth ? "text-slate-300"
-                                : isHoliday ? "text-[#d14d45]" : "text-plum-900"}`}>
+                            isToday ? "bg-plum-800 text-white"
+                              : isHoliday ? "text-[#d14d45]" : "text-plum-900"}`}>
                             {d.getDate()}
                           </span>
                           {bsDays.has(key) && (
-                            <span lang="ne" className={`pt-1.5 text-xs font-semibold leading-none sm:text-sm ${inMonth ? "text-plum-800/60" : "text-slate-300"}`}>
+                            <span lang="ne" className={`pt-1.5 text-xs font-semibold leading-none sm:text-sm text-slate-400`}>
                               {bsDays.get(key)!.split(" ")[0]}
                               {bsDays.get(key)!.includes(" ") && <span className="hidden sm:inline"> {bsDays.get(key)!.split(" ")[1]}</span>}
                             </span>
