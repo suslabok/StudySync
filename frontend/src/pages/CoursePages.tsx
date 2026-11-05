@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useMutation, useQuery } from "@apollo/client/react";
 import { AppShell, Button, Card, LoadError, SemesterNav, SemesterSummary } from "../components/AppShell";
 import Avatar from "../components/Avatar";
+import CourseMeeting from "../components/CourseMeeting";
 import Stream from "../components/CourseSharing";
 import { Assignments } from "../components/TaskWidgets";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
@@ -119,6 +120,8 @@ export default function CoursePage() {
               </div>
             </Card>
           )}
+
+          <CourseMeeting courseId={s.courseId} />
 
           {!s.shared ? (
             <Card role="region" aria-label="Share this course" className="max-w-2xl">

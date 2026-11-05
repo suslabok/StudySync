@@ -232,6 +232,25 @@ def create_material(db: Session, user: User, data: dict) -> dict:
     return _view(db, m)
 
 
+def update_material(db: Session, user: User, material_id, title: str, course_id) -> dict:
+    """Rename a material and/or link it to one of your courses (course_id None = no course)."""
+    m = _mine(db, user, material_id)
+    title = clean_text(title).strip()
+    if not title:
+        raise StudyError("title", "REQUIRED", "Give it a title.")
+    if len(title) > 150:
+        raise StudyError("title", "TOO_LONG", "Keep the title under 150 characters.")
+    new_course = None
+    if course_id is not None and str(course_id) != "":
+        c = db.scalar(select(Course).where(Course.id == _id(course_id, "Course"), Course.owner_id == user.id))
+        if c is None:
+            raise StudyError("courseId", "NOT_FOUND", "Course not found.")
+        new_course = c.id
+    m.title, m.course_id = title, new_course
+    db.commit()
+    return _view(db, m)
+
+
 def generate(db: Session, user: User, material_id) -> tuple[dict, str | None]:
     """(material view, message for the student). Replaces any earlier questions and flashcards."""
     m = _mine(db, user, material_id)
@@ -433,6 +452,7 @@ extend type Query {
 
 extend type Mutation {
   createStudyMaterial(input: StudyInput!): StudyMaterialPayload!
+  updateStudyMaterial(id: ID!, title: String!, courseId: ID): StudyMaterialPayload!
   generateStudy(materialId: ID!): StudyGeneratePayload!
   deleteStudyMaterial(id: ID!): StudyDeletePayload!
   submitQuiz(materialId: ID!, answers: [QuizAnswer!]!): StudyQuizPayload!
@@ -509,6 +529,11 @@ def resolve_attempts(_, info, material_id):
 @mutation.field("createStudyMaterial")
 def resolve_create(_, info, input):
     return _write(info, "material", lambda db, u: {"material": create_material(db, u, input)})
+
+
+@mutation.field("updateStudyMaterial")
+def resolve_update(_, info, id, title, course_id=None):
+    return _write(info, "material", lambda db, u: {"material": update_material(db, u, id, title, course_id)})
 
 
 @mutation.field("generateStudy")

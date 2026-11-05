@@ -6,7 +6,8 @@ import { DUE_SOON, TASKS } from "../graphql/tasks";
 import { Card } from "./AppShell";
 import CourseForm from "./CourseForm";
 
-/** The whole card opens the course. Edit and Delete work for courses in any semester, past ones included. */
+/** The whole card opens the course. Edit and Delete work for courses in any semester, past ones included.
+ *  Students in a classroom can't edit: only the teacher can, so Edit is hidden for them. */
 export default function CourseCard({ course }: { course: Course }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -57,8 +58,10 @@ export default function CourseCard({ course }: { course: Course }) {
           {error && <p role="alert" className="mt-1 text-xs font-medium text-red-600">{error}</p>}
         </div>
         <div className="flex shrink-0 gap-3 self-start">
-          <button type="button" aria-label={`Edit ${course.code}`} onClick={() => setEditing(true)}
-            className={`${actionCls} hover:text-plum-800`}>Edit</button>
+          {course.canEdit !== false && (
+            <button type="button" aria-label={`Edit ${course.code}`} onClick={() => setEditing(true)}
+              className={`${actionCls} hover:text-plum-800`}>Edit</button>
+          )}
           <button type="button" disabled={loading} aria-label={`Delete ${course.code}`} onClick={onDelete}
             className={`${actionCls} hover:text-red-600`}>Delete</button>
         </div>

@@ -4,6 +4,7 @@ import { gql } from "@apollo/client";
 const ERRORS = "errors { field code message }";
 const MATERIAL = `id title sourceKind fileName charCount excerpt generatedBy generatedAt createdAt
   questionCount shortCount cardCount attempts bestPercent
+  course { id code color }
   notes { summary points terms { term meaning } }`;
 
 export const STUDY_CONFIG = gql`query StudyConfig { studyConfig { aiEnabled maxMb maxChars } }`;
@@ -20,6 +21,11 @@ export const CREATE_MATERIAL = gql`
 `;
 export const GENERATE_STUDY = gql`
   mutation GenerateStudy($materialId: ID!) { generateStudy(materialId: $materialId) { material { ${MATERIAL} } message ${ERRORS} } }
+`;
+export const UPDATE_MATERIAL = gql`
+  mutation UpdateStudyMaterial($id: ID!, $title: String!, $courseId: ID) {
+    updateStudyMaterial(id: $id, title: $title, courseId: $courseId) { material { ${MATERIAL} } ${ERRORS} }
+  }
 `;
 export const DELETE_MATERIAL = gql`mutation DeleteStudyMaterial($id: ID!) { deleteStudyMaterial(id: $id) { ok ${ERRORS} } }`;
 export const SUBMIT_QUIZ = gql`
@@ -46,6 +52,7 @@ export type Material = {
   generatedBy: "ai" | "basic" | null; generatedAt: string | null; createdAt: string;
   questionCount: number; shortCount: number; cardCount: number; attempts: number; bestPercent: number | null;
   notes: Notes | null;
+  course: { id: string; code: string; color: string } | null;
 };
 export type Question = { id: string; kind: string; prompt: string; options: string[] | null };
 export type Card = { id: string; front: string; back: string; right: number; wrong: number; weak: boolean };

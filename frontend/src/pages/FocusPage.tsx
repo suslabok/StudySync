@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { AppShell, Banner, Button, Card, SemesterNav, SemesterSummary, fieldCls } from "../components/AppShell";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
@@ -72,6 +72,7 @@ function beep() {
 
 export default function FocusPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const initial = useRef(load()).current;
   const [minutes, setMinutes] = useState(initial.minutes);
   const [timer, setTimer] = useState<Timer>(initial.timer);
@@ -79,6 +80,13 @@ export default function FocusPage() {
   const [notice, setNotice] = useState("");
   const [unsaved, setUnsaved] = useState<Unsaved | null>(null);
   const finishing = useRef(false);
+
+  // Coming from a study material or course: pre-select that course (only while idle, so a running timer is never changed).
+  const wanted = params.get("course");
+  useEffect(() => {
+    if (!wanted || !/^\d+$/.test(wanted)) return;
+    setTimer((t) => (t.status === "idle" && t.mode === "focus" && t.target !== `course:${wanted}` ? { ...t, target: `course:${wanted}` } : t));
+  }, [wanted]);
 
   // data
   const since = useMemo(() => {

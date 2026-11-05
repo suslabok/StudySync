@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { AppShell, Banner, Button, Card, LoadError, SemesterNav, SemesterSummary, fieldCls } from "../components/AppShell";
 import { DASHBOARD, SEMESTERS, type DashboardData, type SemestersData } from "../graphql/dashboard";
 import {
-  DELETE_MATERIAL, GENERATE_STUDY, RECORD_CARD, STUDY_ATTEMPTS, STUDY_CARDS, STUDY_MATERIAL, STUDY_MATERIALS, STUDY_QUESTIONS,
+  DELETE_MATERIAL, GENERATE_STUDY, UPDATE_MATERIAL, RECORD_CARD, STUDY_ATTEMPTS, STUDY_CARDS, STUDY_MATERIAL, STUDY_MATERIALS, STUDY_QUESTIONS,
   SUBMIT_QUIZ, SUBMIT_SHORT, type Attempt, type Card as CardT, type Material, type Question, type QuizItem, type ShortItem,
 } from "../graphql/study";
 
@@ -15,6 +15,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 const CHOICE = ["A", "B", "C", "D"];
 
+/* ------------------------------ notes ------------------------------ */
 function Notes({ m }: { m: Material }) {
   const n = m.notes!;
   return (
@@ -40,6 +41,7 @@ function Notes({ m }: { m: Material }) {
   );
 }
 
+/* ------------------------------ quiz ------------------------------ */
 function Quiz({ id }: { id: string }) {
   const { data, loading, error, refetch } = useQuery<any>(STUDY_QUESTIONS, { variables: { materialId: id, kind: "mcq" }, fetchPolicy: "cache-and-network" });
   const [submit, { loading: sending }] = useMutation<any>(SUBMIT_QUIZ, { refetchQueries: [STUDY_ATTEMPTS, STUDY_MATERIAL, STUDY_MATERIALS] });
@@ -286,6 +288,7 @@ export default function StudyMaterialPage() {
     refetchQueries: [STUDY_QUESTIONS, STUDY_CARDS, STUDY_MATERIALS],
   });
   const [remove] = useMutation<any>(DELETE_MATERIAL, { refetchQueries: [STUDY_MATERIALS] });
+  const [updateMat] = useMutation<any>(UPDATE_MATERIAL, { refetchQueries: [STUDY_MATERIALS] });
   const m: Material | null = data?.studyMaterial ?? null;
   const { data: dash } = useQuery<DashboardData>(DASHBOARD, { fetchPolicy: "cache-and-network" });
   const { data: semData } = useQuery<SemestersData>(SEMESTERS, { fetchPolicy: "cache-and-network" });
@@ -329,8 +332,17 @@ export default function StudyMaterialPage() {
                   {m.sourceKind === "file" ? m.fileName : "Pasted text"} · {m.charCount.toLocaleString()} characters
                   {m.generatedBy && <> · made by {m.generatedBy === "ai" ? "AI" : "basic mode"}</>}
                 </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <label htmlFor="mat-course" className="text-sm font-medium text-slate-700">Course</label>
+                  <select id="mat-course" className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm" value={m.course?.id ?? ""}
+                    onChange={async (e) => { await updateMat({ variables: { id: m.id, title: m.title, courseId: e.target.value || null } }); }}>
+                    <option value="">No course</option>
+                    {(dash?.dashboard.courses ?? []).map((c) => <option key={c.id} value={c.id}>{c.code}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="flex gap-2">
+                {m.course && <Link to={`/focus?course=${m.course.id}`} className="rounded-xl bg-plum-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-plum-900">Start focus</Link>}
                 <Button variant="secondary" onClick={regenerate} disabled={generating}>{generating ? "Working…" : m.generatedAt ? "Regenerate" : "Generate"}</Button>
                 <Button variant="secondary" onClick={del} className="text-red-600">Delete</Button>
               </div>
