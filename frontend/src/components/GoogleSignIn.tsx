@@ -9,7 +9,7 @@ const GOOGLE_LOGIN = gql`
   mutation GoogleLogin($idToken: String!) {
     googleLogin(idToken: $idToken) {
       accessToken
-      user { id email displayName onboarded }
+      user { id email displayName avatarUrl onboarded }
       errors { field code message }
     }
   }
@@ -18,7 +18,7 @@ const GOOGLE_LOGIN = gql`
 type Payload = {
   googleLogin: {
     accessToken: string | null;
-    user: { id: string; email: string; displayName: string; onboarded: boolean } | null;
+    user: { id: string; email: string; displayName: string; avatarUrl: string | null; onboarded: boolean } | null;
     errors: { field: string | null; code: string; message: string }[];
   };
 };

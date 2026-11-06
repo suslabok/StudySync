@@ -1,5 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import AuthPage from "./pages/AuthPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import RequireAuth from "./auth/RequireAuth";
 import ProfilePage from "./pages/ProfilePage";
@@ -16,16 +18,18 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/register" element={<AuthPage mode="register" />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<RequireAuth />}>
-  <Route path="/" element={<DashboardPage />} />
-  <Route path="/profile" element={<ProfilePage />} />
-  <Route path="/courses/:id" element={<CoursePage />} />
-  <Route path="/courses" element={<CoursesPage />} />
-  <Route path="/tasks" element={<TasksPage />} />
-  <Route path="/calendar" element={<CalendarPage />} />
-<Route path="/focus" element={<FocusPage />} />
-  <Route path="/study" element={<StudyPage />} />
-  <Route path="/study/:id" element={<StudyMaterialPage />} />
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/courses/:id" element={<CoursePage />} />
+        <Route path="/courses" element={<CoursesPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/focus" element={<FocusPage />} />
+        <Route path="/study" element={<StudyPage />} />
+        <Route path="/study/:id" element={<StudyMaterialPage />} />
       </Route>
     </Routes>
   );

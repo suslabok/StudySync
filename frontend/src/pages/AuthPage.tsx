@@ -7,11 +7,11 @@ import GoogleSignIn from "../components/GoogleSignIn";
 
 const MIN_PASSWORD_LENGTH = 8;
 
-const FIELDS = `accessToken user { id email displayName onboarded } errors { field code message }`;
+const FIELDS = `accessToken user { id email displayName avatarUrl onboarded } errors { field code message }`;
 const LOGIN = gql(`mutation Login($email:String!,$password:String!){ login(email:$email,password:$password){ ${FIELDS} } }`);
 const REGISTER = gql(`mutation Register($email:String!,$password:String!,$displayName:String!){ register(email:$email,password:$password,displayName:$displayName){ ${FIELDS} } }`);
 
-const css = `
+export const authCss = `
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700;800&display=swap');
 .gf *,.gf *::before,.gf *::after{box-sizing:border-box}
 .gf{
@@ -62,7 +62,18 @@ const css = `
 .gf .eye{position:absolute;top:0;right:6px;width:36px;height:42px;display:grid;place-items:center;border:0;border-radius:10px;background:none;color:#777;cursor:pointer}
 .gf .eye:hover{color:var(--ink)}
 .gf .eye:focus-visible{outline:2px solid #333;outline-offset:-2px}
+.gf .forgot{align-self:flex-end;margin:-6px 4px 8px 0;font-size:11px;font-weight:600;color:#666;text-decoration:none}
+.gf .forgot:hover{color:var(--ink);text-decoration:underline}
+.gf .single{width:440px;max-width:100%;min-height:0;padding:44px 40px;text-align:center}
+.gf .single p.err{margin:12px 0 0;min-height:0;font-size:12px;color:#c0392b}
+.gf .single p.err:empty{display:none}
+.gf .single p{margin:0 0 18px;font-size:13px;font-weight:500;color:#555;line-height:1.5}
+.gf .single form{display:flex;flex-direction:column;align-items:center}
+.gf .single .back{display:inline-block;margin-top:22px;font-size:12px;font-weight:700;color:#666;text-decoration:none}
+.gf .single .back:hover{color:var(--ink);text-decoration:underline}
+.gf .ok{color:#1e7a46}
 @media (max-width:600px){
+  .gf .single{padding:32px 20px}
   .gf .pane form{padding:0 16px}
   .gf h1,.gf .ov-pane h2{font-size:22px}
   .gf .ov-pane{padding:0 14px}.gf .ov-pane p{font-size:12px}
@@ -71,7 +82,7 @@ const css = `
 @media (prefers-reduced-motion:reduce){.gf *{transition:none!important}}
 `;
 
-function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+export function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   const [show, setShow] = useState(false);
   return (
     <div className="pw">
@@ -125,7 +136,7 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
 
   return (
     <div className="gf">
-      <style>{css}</style>
+      <style>{authCss}</style>
       <main className={"box" + (isRegister ? " right" : "")}>
         {/* Register form: slides in on the right */}
         <div className="pane up" aria-hidden={!isRegister}>
@@ -157,6 +168,7 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
             {/* No minLength here: login must never reject an existing password client-side */}
             <PasswordInput placeholder="Password" aria-label="Password" autoComplete="current-password"
               value={form.password} onChange={set("password")} required tabIndex={isRegister ? -1 : 0} />
+            <Link className="forgot" to="/forgot-password" tabIndex={isRegister ? -1 : 0}>Forgot password?</Link>
             <button className="btn" disabled={loading} tabIndex={isRegister ? -1 : 0}>
               {loading ? "Please wait…" : "Sign in"}
             </button>
