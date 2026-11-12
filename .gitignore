@@ -12,6 +12,7 @@ __pycache__/
 # node
 node_modules/
 dist/
+docker.env 
 
 # local files
 *.db

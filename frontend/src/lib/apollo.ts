@@ -3,7 +3,10 @@ import {
 } from "@apollo/client";
 import { setToken, getToken } from "../auth/token";
 
-const URI = (import.meta.env.VITE_GRAPHQL_URL || "http://localhost:8000/graphql").replace(/\/*$/, "/");
+const URI = (
+  import.meta.env.VITE_GRAPHQL_URL ||
+  (import.meta.env.DEV ? "http://localhost:8000/graphql" : "/graphql")
+).replace(/\/*$/, "/");
 
 const httpLink = new HttpLink({ uri: URI, credentials: "include" });
 

@@ -9,6 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from app.api import schema
 from app.profile import MEDIA_DIR
 
+from app.spa import mount_frontend
+
 load_dotenv()
 
 
@@ -50,3 +52,5 @@ app.mount("/graphql", CookieMiddleware(GraphQL(
     context_value=lambda request, data: {"request": request},
     debug=True,
 )))
+
+mount_frontend(app)
