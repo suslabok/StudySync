@@ -1,4 +1,5 @@
 import os
+
 from ariadne import MutationType, ObjectType, QueryType, make_executable_schema
 from graphql import GraphQLError
 
@@ -7,6 +8,7 @@ from app.auth import (REFRESH_DAYS, AuthError, authenticate, authenticate_google
                       logout_refresh_token, register_user, rotate_refresh_token)
 from app.database import SessionLocal
 from app.models import User
+from app.security import client_ip, describe_wait, login_guard, register_guard
 
 REFRESH_COOKIE = "refresh_token"
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "0") == "1"   # set to 1 behind HTTPS
@@ -87,6 +89,11 @@ def resolve_onboarded(user, _):
 
 @mutation.field("register")
 def resolve_register(_, info, email, password, display_name):
+    ip = client_ip(info.context["request"])
+    wait = register_guard.blocked(ip)
+    if wait:
+        return _error_payload(AuthError("TOO_MANY_ATTEMPTS", f"Too many sign-ups from this connection. Try again in {describe_wait(wait)}."))
+    register_guard.hit(ip)
     with SessionLocal() as db:
         try:
             user = register_user(db, email, password, display_name)
@@ -99,11 +106,17 @@ def resolve_register(_, info, email, password, display_name):
 
 @mutation.field("login")
 def resolve_login(_, info, email, password):
+    ip = client_ip(info.context["request"])
+    wait = login_guard.blocked(ip, email)
+    if wait:
+        return _error_payload(AuthError("TOO_MANY_ATTEMPTS", f"Too many attempts. Try again in {describe_wait(wait)}."))
     with SessionLocal() as db:
         try:
             user = authenticate(db, email, password)
         except AuthError as e:
+            login_guard.failed(ip, email)
             return _error_payload(e)
+        login_guard.succeeded(ip, email)
         raw = issue_refresh_token(db, user.id)
         db.commit()
         return _success(info, db, user, raw)

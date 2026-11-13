@@ -6,12 +6,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+load_dotenv()          # must run before the app modules below read their settings
+
 from app.api import schema
 from app.profile import MEDIA_DIR
-
+from app.security import BodyLimitMiddleware, QueryLimits, SecurityHeadersMiddleware, safe_format_error
 from app.spa import mount_frontend
 
-load_dotenv()
+try:                    # production: a browser opening /graphql must not get an API playground
+    from ariadne.explorer import ExplorerHttp405
+except ImportError:     # very old ariadne
+    ExplorerHttp405 = None
+
+# DEBUG=1 (in your local backend/.env only) shows error details, the /docs page and the GraphQL explorer.
+DEBUG = os.getenv("DEBUG", "0") == "1"
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "0") == "1"
+MAX_BODY_BYTES = int(float(os.getenv("MAX_BODY_MB", "12")) * 1024 * 1024)
+CSP_MODE = os.getenv("CSP_MODE", "report")      # report | enforce | off
 
 
 class CookieMiddleware:
@@ -34,7 +45,16 @@ class CookieMiddleware:
         await self.app(scope, receive, send_with_cookies)
 
 
-app = FastAPI(title="StudySync API")
+app = FastAPI(
+    title="StudySync API",
+    docs_url="/docs" if DEBUG else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if DEBUG else None,
+)
+
+# The last middleware added is the outermost one, so CORS answers first.
+app.add_middleware(SecurityHeadersMiddleware, csp_mode=CSP_MODE, hsts=COOKIE_SECURE)
+app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY_BYTES)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
@@ -50,7 +70,11 @@ app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 app.mount("/graphql", CookieMiddleware(GraphQL(
     schema,
     context_value=lambda request, data: {"request": request},
-    debug=True,
+    debug=DEBUG,
+    introspection=DEBUG,
+    validation_rules=[QueryLimits],
+    error_formatter=safe_format_error,
+    explorer=None if (DEBUG or ExplorerHttp405 is None) else ExplorerHttp405(),
 )))
 
 mount_frontend(app)
